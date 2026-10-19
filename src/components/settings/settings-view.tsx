@@ -22,6 +22,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, Input, Select } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
+import { BcaIntegrationCard, type BcaIntegrationInfo } from "@/components/settings/bca-integration-card";
 import { CURRENCY_LIST } from "@/lib/constants";
 import { apiPatch, apiPost, apiErrorMessage } from "@/lib/client-api";
 import { formatDateLong } from "@/lib/date";
@@ -60,7 +61,13 @@ function SectionCard({
   );
 }
 
-export function SettingsView({ user }: { user: SessionUser }) {
+export function SettingsView({
+  user,
+  bcaIntegration,
+}: {
+  user: SessionUser;
+  bcaIntegration: BcaIntegrationInfo;
+}) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
@@ -300,6 +307,8 @@ export function SettingsView({ user }: { user: SessionUser }) {
           ) : null}
         </div>
       </SectionCard>
+
+      <BcaIntegrationCard integration={bcaIntegration} />
 
       <SectionCard
         title="Pasang aplikasi"

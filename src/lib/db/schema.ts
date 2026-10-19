@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
  * Catatku — skema database (SQLite / Drizzle ORM).
@@ -123,6 +123,38 @@ export const reminders = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [index("reminders_user_idx").on(t.userId)],
+);
+
+/**
+ * Transaksi yang masuk otomatis (dari email BCA atau impor mutasi) dan
+ * menunggu konfirmasi pengguna sebelum dicatat sebagai transaksi final.
+ */
+export const pendingTransactions = sqliteTable(
+  "pending_transactions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    source: text("source", { enum: ["email", "statement"] }).notNull(),
+    externalId: text("external_id").notNull(),
+    type: text("type", { enum: ["income", "expense"] }).notNull(),
+    amount: integer("amount").notNull(),
+    note: text("note"),
+    date: text("date").notNull(),
+    rawSubject: text("raw_subject"),
+    rawFrom: text("raw_from"),
+    confidence: text("confidence", { enum: ["high", "low"] }),
+    status: text("status", { enum: ["pending", "confirmed", "ignored"] })
+      .notNull()
+      .default("pending"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("pending_user_external_idx").on(t.userId, t.externalId),
+    index("pending_user_status_idx").on(t.userId, t.status),
+  ],
 );
 
 export type UserRow = typeof users.$inferSelect;

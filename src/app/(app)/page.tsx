@@ -4,6 +4,8 @@ import {
   ArrowRight,
   ArrowUpRight,
   BellRing,
+  ChevronRight,
+  Inbox,
   PiggyBank,
   Sparkles,
   Target,
@@ -21,6 +23,7 @@ import {
 } from "@/components/transactions/transaction-list";
 import { requireUser } from "@/lib/auth";
 import { getDashboardData } from "@/lib/data";
+import { countPendingTransactions } from "@/lib/inbox";
 import { currentHourJakarta, formatDateLong, todayISO } from "@/lib/date";
 import { formatMoney } from "@/lib/money";
 import type { BudgetUsageDTO, SummaryDTO } from "@/lib/types";
@@ -261,6 +264,7 @@ function GoalsPreview({
 export default async function HomePage() {
   const user = await requireUser();
   const { summary, recent, budgetUsage, goals } = await getDashboardData(user.id);
+  const pendingCount = await countPendingTransactions(user.id);
   const currency = user.currency;
   const firstName = user.name.split(" ")[0] ?? user.name;
   const greeting = greetingForHour(currentHourJakarta());
@@ -288,6 +292,26 @@ export default async function HomePage() {
           </Link>
         </div>
       </header>
+
+      {pendingCount > 0 ? (
+        <Link
+          href="/inbox"
+          className="flex items-center gap-3 rounded-3xl border border-primary/25 bg-primary-soft/70 px-4 py-3.5 transition-colors hover:bg-primary-soft"
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+            <Inbox className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13.5px] font-semibold">
+              {pendingCount} transaksi menunggu konfirmasi
+            </p>
+            <p className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">
+              Dari email BCA / impor mutasi. Cek nominal dan kategorinya dulu.
+            </p>
+          </div>
+          <ChevronRight className="size-4 shrink-0 text-primary" />
+        </Link>
+      ) : null}
 
       {isNewUser ? (
         <WelcomeCard />

@@ -11,6 +11,7 @@ import {
   ChevronRight,
   History,
   Home,
+  Inbox,
   LayoutGrid,
   Plus,
   Settings,
@@ -38,6 +39,7 @@ const NAV = [
   { href: "/grafik", label: "Grafik", icon: BarChart3 },
   { href: "/kategori", label: "Kategori", icon: Tag },
   { href: "/target", label: "Target", icon: Target },
+  { href: "/inbox", label: "Kotak masuk", icon: Inbox },
   { href: "/pengingat", label: "Pengingat", icon: Bell },
   { href: "/pengaturan", label: "Pengaturan", icon: Settings },
 ] as const;
@@ -83,7 +85,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   const secondary = NAV.filter((item) =>
-    ["/kategori", "/target", "/pengingat", "/pengaturan"].includes(item.href),
+    ["/inbox", "/kategori", "/target", "/pengingat", "/pengaturan"].includes(item.href),
   );
 
   return (

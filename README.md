@@ -18,8 +18,11 @@ Aplikasi **PWA mobile-first** untuk mencatat pemasukan & pengeluaran harian: sis
 | 3 | Pengingat harian (jam/hari/toggle) + notifikasi batas belanja + notifikasi browser | ✅ |
 | 4 | Daftar/masuk/keluar akun, profil, mata uang, tema terang/gelap | ✅ |
 | 4 | Ekspor CSV/JSON + pulihkan cadangan JSON | ✅ |
+| — | **Integrasi BCA**: transaksi dari email notifikasi BCA masuk Kotak Masuk + impor mutasi/e-Statement CSV | ✅ |
 | — | PWA: manifest, ikon, service worker, offline fallback, install prompt | ✅ |
 | — | Data terisolasi per pengguna (sesi cookie + `user_id` di semua tabel) | ✅ |
+
+> 🔗 Integrasi BCA (email & impor mutasi) dijelaskan di [docs/BCA-INTEGRATION.md](docs/BCA-INTEGRATION.md). MyBCA tidak punya API publik untuk rekening pribadi, jadi auto-catat memakai email notifikasi resmi BCA (dengan langkah konfirmasi).
 
 **Akun demo:** `demo@catatku.id` / `demo12345` — tombol **“Coba akun demo”** di halaman masuk. Berisi ±2,5 bulan transaksi, 2 target tabungan, batas belanja, dan pengingat.
 
@@ -37,6 +40,10 @@ Aplikasi **PWA mobile-first** untuk mencatat pemasukan & pengeluaran harian: sis
 | --- | --- | --- |
 | ![Pengingat](docs/screenshots/13-pengingat.png) | ![Dark mode](docs/screenshots/15-beranda-dark.png) | ![Desktop](docs/screenshots/16-beranda-desktop.png) |
 
+| Kotak Masuk (integrasi BCA) | Integrasi di Pengaturan |
+| --- | --- |
+| ![Kotak Masuk](docs/screenshots/18-kotak-masuk.png) | ![Integrasi BCA](docs/screenshots/19-integrasi-bca.png) |
+
 Semua screenshot dihasilkan dari build produksi dengan akun demo (folder `docs/screenshots/`). Tangkapan login, validasi form, filter riwayat, editor kategori, dan grafik desktop juga tersedia di sana.
 
 ## ✅ Verifikasi
@@ -45,6 +52,7 @@ Semua screenshot dihasilkan dari build produksi dengan akun demo (folder `docs/s
 - Uji end-to-end browser (Edge headless via Playwright): **12/12 alur lulus**, **0 error console/pageerror**, **0 overflow horizontal** pada 390px & 1440px.
   Alur yang diuji: login demo → catat pengeluaran (termasuk validasi nominal kosong) → sisa uang berubah → riwayat cari/ubah/hapus → kategori tambah/ubah/hapus → target buat/tambah tabungan/hapus → toggle pengingat → ganti mata uang USD↔IDR → tema gelap/terang → ekspor CSV/JSON → proteksi rute tanpa sesi → logout → manifest/ikon/service worker.
 - PWA: manifest + 4 ikon + `sw.js` terdaftar dan aktif di build produksi.
+- Integrasi BCA diuji dengan **email asli** (`Internet Transaction Journal`): nominal Rp50.000, tanggal 19 Okt 2026, merchant “AYAM GEPUK SYIFA” terbaca benar (confidence high) + impor mutasi CSV, konfirmasi, dan deduplikasi lulus.
 - `docs/FOUNDATION.md` berisi kontrak internal (skema data, API, komponen) yang dipakai saat pengembangan.
 
 
