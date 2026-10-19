@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Catatku">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14a174" />
+      <stop offset="0.55" stop-color="#0b6a4d" />
+      <stop offset="1" stop-color="#084536" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="url(#bg)" />
+  <circle cx="408" cy="86" r="82" fill="#ffffff" opacity="0.1" />
+  <rect x="112" y="170" width="288" height="192" rx="48" fill="#ffffff" />
+  <circle cx="352" cy="266" r="40" fill="#0b6a4d" />
+  <circle cx="352" cy="266" r="15" fill="#f1c15e" />
+  <rect x="112" y="170" width="288" height="52" rx="26" fill="#eafff6" opacity="0.75" />
+</svg>

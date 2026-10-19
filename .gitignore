@@ -1,0 +1,29 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# local data & tooling
+/data/
+/backups/
+/.npm-cache/
+/.npm-logs/
+/.appdata/
+*.log
+
+# env
+.env*
+!.env.example
+
+# misc
+.DS_Store
+Thumbs.db
+*.tsbuildinfo

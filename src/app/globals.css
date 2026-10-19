@@ -1,0 +1,268 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-elevated: var(--elevated);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --radius-4xl: 2rem;
+}
+
+:root {
+  --background: #f4f6f3;
+  --surface: #edf1ec;
+  --foreground: #10201a;
+  --card: #ffffff;
+  --card-foreground: #10201a;
+  --elevated: #ffffff;
+  --muted: #e9eee8;
+  --muted-foreground: #64786d;
+  --primary: #0e7a56;
+  --primary-foreground: #ffffff;
+  --primary-soft: #dcf0e6;
+  --accent: #c1922f;
+  --accent-foreground: #3a2a08;
+  --border: #dfe6de;
+  --ring: #0e7a56;
+  --success: #117f58;
+  --success-soft: #e0f3ea;
+  --danger: #c44a3d;
+  --danger-soft: #fae8e5;
+  --warning: #ac7212;
+  --warning-soft: #fbefd8;
+}
+
+.dark {
+  --background: #0a110e;
+  --surface: #0e1713;
+  --foreground: #e9f1ec;
+  --card: #111c17;
+  --card-foreground: #e9f1ec;
+  --elevated: #16231d;
+  --muted: #17241e;
+  --muted-foreground: #91a69a;
+  --primary: #45c79a;
+  --primary-foreground: #04130c;
+  --primary-soft: #11352a;
+  --accent: #e0b45c;
+  --accent-foreground: #1e1505;
+  --border: #20312a;
+  --ring: #45c79a;
+  --success: #4cd3a2;
+  --success-soft: #0f2f26;
+  --danger: #f0786c;
+  --danger-soft: #331a17;
+  --warning: #e8b25c;
+  --warning-soft: #322510;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01" 1, "cv11" 1;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    min-height: 100dvh;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--primary) 22%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
+    cursor: pointer;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .app-canvas {
+    background-color: var(--background);
+    background-image:
+      radial-gradient(
+        70rem 42rem at 108% -12%,
+        color-mix(in oklab, var(--primary) 11%, transparent),
+        transparent 62%
+      ),
+      radial-gradient(
+        44rem 30rem at -12% 4%,
+        color-mix(in oklab, var(--accent) 8%, transparent),
+        transparent 58%
+      );
+    background-attachment: fixed;
+  }
+
+  .hero-card {
+    background-image: linear-gradient(135deg, #10805c 0%, #0b6248 46%, #0d3f33 100%);
+    box-shadow:
+      0 1px 2px rgba(4, 30, 20, 0.14),
+      0 22px 46px -24px rgba(4, 40, 26, 0.6);
+  }
+
+  .dark .hero-card {
+    background-image: linear-gradient(135deg, #14855f 0%, #0b5b44 52%, #0a3629 100%);
+  }
+
+  .glass-bar {
+    background-color: color-mix(in oklab, var(--card) 78%, transparent);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+  }
+
+  .money {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .hairline {
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border) 85%, transparent);
+  }
+}
+
+@layer utilities {
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes sheet-up {
+    from {
+      opacity: 0;
+      transform: translateY(28px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-rise {
+    animation: rise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-fade {
+    animation: fade-in 0.25s ease-out both;
+  }
+
+  .delay-1 {
+    animation-delay: 50ms;
+  }
+
+  .delay-2 {
+    animation-delay: 100ms;
+  }
+
+  .delay-3 {
+    animation-delay: 150ms;
+  }
+}
+
+.dialog-overlay[data-state="open"] {
+  animation: fade-in 0.2s ease-out;
+}
+
+.sheet-content[data-state="open"] {
+  animation: sheet-up 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sheet-content[data-state="closed"] {
+  animation: fade-in 0.15s ease-in reverse;
+}
+
+@media (min-width: 640px) {
+  .sheet-content[data-state="open"] {
+    animation: pop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
