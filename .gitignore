@@ -21,6 +21,8 @@ next-env.d.ts
 /tools/qr/node_modules/
 /tunnel-qr.png
 /vercel-qr.png
+/gmail-bca-forwarder-live.gs
+/scripts/tmp-*.mjs
 *.log
 
 # env
