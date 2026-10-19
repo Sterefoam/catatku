@@ -20,6 +20,7 @@ next-env.d.ts
 /.appdata/
 /tools/qr/node_modules/
 /tunnel-qr.png
+/vercel-qr.png
 *.log
 
 # env

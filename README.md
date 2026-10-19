@@ -2,6 +2,8 @@
 
 Aplikasi **PWA mobile-first** untuk mencatat pemasukan & pengeluaran harian: sisa uang, arus kas bulan ini, grafik, kategori, riwayat, target tabungan, batas belanja, pengingat harian, serta pengaturan akun. Dibangun sesuai PRD (`PRD.md`) dan 8 spesifikasi halaman di folder ini.
 
+> 🌐 **Live:** **https://catatku-dun.vercel.app** — berjalan 24/7 di **Vercel + Turso (libSQL cloud)**, jadi tetap hidup walaupun laptop dimatikan. Bisa dipasang sebagai PWA di iPhone.
+
 ## ✨ Fitur
 
 | Fase | Fitur | Status |

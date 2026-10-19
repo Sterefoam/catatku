@@ -9,6 +9,8 @@ Database:
 - Lokal: file SQLite `data/app.db` (kompatibel libSQL).
 - Produksi: **Turso** (libSQL cloud) — set `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`. Tidak ada file yang perlu di-mount.
 
+> ✅ **Deployment aktif:** **https://catatku-dun.vercel.app** (project Vercel `catatku`, database Turso `catatku`). Panduan di bawah tetap berlaku untuk deploy ulang / pindah akun.
+
 ---
 
 ## ⭐ Rekomendasi: Vercel + Turso (gratis, laptop boleh mati)
