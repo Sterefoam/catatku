@@ -1,0 +1,16 @@
+node_modules
+.next
+data
+backups
+docs
+tools
+.npm-cache
+.npm-logs
+.git
+.gitignore
+README.md
+tunnel-qr.png
+.npmrc
+Dockerfile
+.dockerignore
+*.log

@@ -17,6 +17,8 @@ next-env.d.ts
 /.npm-cache/
 /.npm-logs/
 /.appdata/
+/tools/qr/node_modules/
+/tunnel-qr.png
 *.log
 
 # env

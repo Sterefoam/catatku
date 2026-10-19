@@ -74,7 +74,10 @@ export function authenticate(email: string, password: string): SessionUser {
   return toSessionUser(row);
 }
 
-export async function createSession(userId: string): Promise<void> {
+export async function createSession(
+  userId: string,
+  options: { secure?: boolean } = {},
+): Promise<void> {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
 
@@ -89,11 +92,20 @@ export async function createSession(userId: string): Promise<void> {
     })
     .run();
 
+  // `Secure` hanya dipasang bila koneksi HTTPS (atau dipaksa lewat COOKIE_SECURE),
+  // supaya login tetap berfungsi saat diakses lewat HTTP LAN / tunnel tanpa TLS.
+  const secure =
+    process.env.COOKIE_SECURE === "1"
+      ? true
+      : process.env.COOKIE_SECURE === "0"
+        ? false
+        : (options.secure ?? process.env.NODE_ENV === "production");
+
   const jar = await cookies();
   jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure,
     path: "/",
     expires: new Date(expiresAt),
   });

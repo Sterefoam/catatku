@@ -1,4 +1,4 @@
-import { jsonError, jsonOk, readJson, validationError } from "@/lib/api";
+import { isSecureRequest, jsonError, jsonOk, readJson, validationError } from "@/lib/api";
 import { createSession, createUser, isUniqueEmailError } from "@/lib/auth";
 import { registerSchema } from "@/lib/validation";
 
@@ -9,7 +9,7 @@ export async function POST(request: Request) {
 
   try {
     const user = createUser(parsed.data);
-    await createSession(user.id);
+    await createSession(user.id, { secure: isSecureRequest(request) });
     return jsonOk({ user }, 201);
   } catch (error) {
     if (isUniqueEmailError(error)) {

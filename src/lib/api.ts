@@ -49,3 +49,19 @@ export function numberParam(value: string | null, fallback: number): number {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
+
+/**
+ * Deteksi apakah request datang lewat HTTPS (mis. di belakang reverse proxy
+ * atau tunnel) agar cookie sesi bisa diberi flag `Secure` dengan tepat.
+ */
+export function isSecureRequest(request: Request): boolean {
+  const forwarded = request.headers.get("x-forwarded-proto");
+  if (forwarded) {
+    return forwarded.split(",")[0]?.trim().toLowerCase() === "https";
+  }
+  try {
+    return new URL(request.url).protocol === "https:";
+  } catch {
+    return false;
+  }
+}

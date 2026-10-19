@@ -57,6 +57,8 @@ Semua screenshot dihasilkan dari build produksi dengan akun demo (folder `docs/s
 ## 🚀 Menjalankan
 
 > Butuh **Node.js 22.6+** — skrip CLI memanfaatkan dukungan TypeScript native Node. Build produksi diverifikasi di Node 26.
+>
+> **Mau buka di iPhone / publish ke internet?** Ikuti [docs/PUBLISH.md](docs/PUBLISH.md) — berisi opsi Wi-Fi LAN, tunnel HTTPS, Tailscale, sampai deploy permanen (Railway/Render/Fly/VPS/Docker).
 
 ```bash
 npm install
