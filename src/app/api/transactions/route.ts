@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const typeParam = params.get("type");
   const type = typeParam === "income" || typeParam === "expense" ? (typeParam as TxType) : undefined;
 
-  const items = listTransactions(auth.user.id, {
+  const items = await listTransactions(auth.user.id, {
     limit: Number(params.get("limit") ?? 300),
     offset: Number(params.get("offset") ?? 0),
     type,
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const parsed = transactionSchema.safeParse(body);
   if (!parsed.success) return validationError(parsed.error);
 
-  const transaction = createTransaction(auth.user.id, {
+  const transaction = await createTransaction(auth.user.id, {
     type: parsed.data.type,
     amount: parsed.data.amount,
     categoryId: parsed.data.categoryId,

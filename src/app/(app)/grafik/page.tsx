@@ -19,7 +19,7 @@ export default async function GrafikPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireUser();
-  const transactions = listAllTransactions(user.id);
+  const transactions = await listAllTransactions(user.id);
   const { range } = await searchParams;
 
   return (

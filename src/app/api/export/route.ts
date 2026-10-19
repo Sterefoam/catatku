@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   if (auth.response) return auth.response;
 
   const format = new URL(request.url).searchParams.get("format") === "json" ? "json" : "csv";
-  const transactions = listAllTransactions(auth.user.id);
+  const transactions = await listAllTransactions(auth.user.id);
   const stamp = new Date().toISOString().slice(0, 10);
 
   if (format === "json") {

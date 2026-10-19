@@ -8,8 +8,8 @@ export const metadata = { title: "Target & Progres" };
 
 export default async function TargetPage() {
   const user = await requireUser();
-  const goals = getGoals(user.id);
-  const budgetUsage = getBudgetUsage(user.id);
+  const goals = await getGoals(user.id);
+  const budgetUsage = await getBudgetUsage(user.id);
 
   // Contoh nominal untuk empty state: dana darurat ±6× pengeluaran bulan ini.
   const emergencySuggestion =

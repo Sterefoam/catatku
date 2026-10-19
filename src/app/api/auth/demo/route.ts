@@ -6,8 +6,8 @@ import { DEMO_EMAIL, DEMO_PASSWORD, seedDemoData } from "@/lib/db/demo-seed";
 /** Masuk cepat ke akun demo yang sudah terisi data contoh. */
 export async function POST(request: Request) {
   try {
-    seedDemoData(db);
-    const user = authenticate(DEMO_EMAIL, DEMO_PASSWORD);
+    await seedDemoData(db);
+    const user = await authenticate(DEMO_EMAIL, DEMO_PASSWORD);
     await createSession(user.id, { secure: isSecureRequest(request) });
     return jsonOk({ user });
   } catch (error) {

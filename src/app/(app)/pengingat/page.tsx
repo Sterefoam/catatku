@@ -7,8 +7,8 @@ export const metadata = { title: "Pengingat" };
 
 export default async function PengingatPage() {
   const user = await requireUser();
-  const reminder = getReminder(user.id);
-  const budgetUsage = getBudgetUsage(user.id);
+  const reminder = await getReminder(user.id);
+  const budgetUsage = await getBudgetUsage(user.id);
 
   return (
     <div>

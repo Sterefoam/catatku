@@ -9,7 +9,7 @@ import { getCategories } from "@/lib/data";
 export async function GET() {
   const auth = await requireApiUser();
   if (auth.response) return auth.response;
-  return jsonOk({ categories: getCategories(auth.user.id) });
+  return jsonOk({ categories: await getCategories(auth.user.id) });
 }
 
 export async function POST(request: Request) {
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const parsed = categorySchema.safeParse(body);
   if (!parsed.success) return validationError(parsed.error);
 
-  const duplicate = db
+  const duplicateRows = await db
     .select({ id: categories.id })
     .from(categories)
     .where(
@@ -40,10 +40,9 @@ export async function POST(request: Request) {
         eq(categories.type, parsed.data.type),
         sql`lower(${categories.name}) = ${parsed.data.name.toLowerCase()}`,
       ),
-    )
-    .get();
+    );
 
-  if (duplicate) {
+  if (duplicateRows.length > 0) {
     return jsonError(
       "Kategori dengan nama itu sudah ada. Pakai nama lain atau ubah kategori yang sudah ada.",
       409,
@@ -52,19 +51,18 @@ export async function POST(request: Request) {
 
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
-  db.insert(categories)
-    .values({
-      id,
-      userId: auth.user.id,
-      name: parsed.data.name,
-      type: parsed.data.type,
-      icon: parsed.data.icon,
-      color: parsed.data.color,
-      isDefault: false,
-      createdAt: now,
-    })
-    .run();
+  await db.insert(categories).values({
+    id,
+    userId: auth.user.id,
+    name: parsed.data.name,
+    type: parsed.data.type,
+    icon: parsed.data.icon,
+    color: parsed.data.color,
+    isDefault: false,
+    createdAt: now,
+  });
 
-  const created = getCategories(auth.user.id).find((category) => category.id === id) ?? null;
+  const created =
+    (await getCategories(auth.user.id)).find((category) => category.id === id) ?? null;
   return jsonOk({ category: created }, 201);
 }

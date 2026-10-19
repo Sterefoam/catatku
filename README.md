@@ -50,7 +50,7 @@ Semua screenshot dihasilkan dari build produksi dengan akun demo (folder `docs/s
 
 - **Next.js 15** (App Router, Server Components, Route Handlers) + **React 19** + **TypeScript**
 - **Tailwind CSS v4** dengan design token terang/gelap (shadcn-style UI kit ditulis sendiri di `src/components/ui`)
-- **Drizzle ORM + SQLite** (`better-sqlite3`), migrasi SQL di `drizzle/`
+- **Drizzle ORM + libSQL** — lokal memakai file SQLite (`data/app.db`), produksi serverless memakai **Turso** (`TURSO_DATABASE_URL`). Migrasi SQL di `drizzle/` dan dijalankan otomatis.
 - **Autentikasi sesi sendiri**: scrypt (`node:crypto`) + cookie HttpOnly + tabel `sessions`, sesuai skema `users`/`sessions` di PRD. *(PRD menyebut Better Auth; karena skema PRD memakai `password_hash`/`sessions.token` sendiri, autentikasi diimplementasikan langsung agar cocok dengan skema tersebut — tanpa dependensi pihak ketiga.)*
 - **Zod** untuk validasi input, **Radix UI** untuk dialog/switch, **Sonner** untuk toast, **Lucide** untuk ikon
 
@@ -58,7 +58,9 @@ Semua screenshot dihasilkan dari build produksi dengan akun demo (folder `docs/s
 
 > Butuh **Node.js 22.6+** — skrip CLI memanfaatkan dukungan TypeScript native Node. Build produksi diverifikasi di Node 26.
 >
-> **Mau buka di iPhone / publish ke internet?** Ikuti [docs/PUBLISH.md](docs/PUBLISH.md) — berisi opsi Wi-Fi LAN, tunnel HTTPS, Tailscale, sampai deploy permanen (Railway/Render/Fly/VPS/Docker).
+> **Mau buka di iPhone / publish ke internet?** Ikuti [docs/PUBLISH.md](docs/PUBLISH.md) — berisi opsi Wi-Fi LAN, tunnel HTTPS, Tailscale, sampai deploy permanen.
+>
+> **Agar tetap hidup saat laptop dimatikan:** deploy gratis ke **Vercel + Turso** — lihat [bagian rekomendasi di docs/PUBLISH.md](docs/PUBLISH.md#-rekomendasi-vercel--turso-gratis-laptop-boleh-mati).
 
 ```bash
 npm install

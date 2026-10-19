@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { addDaysToISO, todayISO } from "../date";
 import { hashPassword } from "../password";
 import type { DatabaseClient } from "./index";
@@ -70,8 +71,11 @@ const EXPENSE_TEMPLATES: DemoExpenseTemplate[] = [
   },
 ];
 
-export function seedDemoData(db: DatabaseClient): { userId: string; created: boolean } {
-  const found = db.select().from(users).all().find((row) => row.email === DEMO_EMAIL);
+export async function seedDemoData(
+  db: DatabaseClient,
+): Promise<{ userId: string; created: boolean }> {
+  const existing = await db.select().from(users);
+  const found = existing.find((row) => row.email === DEMO_EMAIL);
   if (found) {
     return { userId: found.id, created: false };
   }
@@ -79,21 +83,22 @@ export function seedDemoData(db: DatabaseClient): { userId: string; created: boo
   const userId = randomUUID();
   const now = new Date().toISOString();
 
-  db.insert(users)
-    .values({
-      id: userId,
-      name: "Rina Pratama",
-      email: DEMO_EMAIL,
-      passwordHash: hashPassword(DEMO_PASSWORD),
-      currency: "IDR",
-      theme: "light",
-      createdAt: now,
-    })
-    .run();
+  await db.insert(users).values({
+    id: userId,
+    name: "Rina Pratama",
+    email: DEMO_EMAIL,
+    passwordHash: hashPassword(DEMO_PASSWORD),
+    currency: "IDR",
+    theme: "light",
+    createdAt: now,
+  });
 
-  seedDefaultCategories(db, userId);
+  await seedDefaultCategories(db, userId);
 
-  const categoryRows = db.select().from(categories).all();
+  const categoryRows = await db
+    .select()
+    .from(categories)
+    .where(eq(categories.userId, userId));
   const categoryId = (name: string): string => {
     const row = categoryRows.find((candidate) => candidate.name === name);
     if (!row) throw new Error(`Kategori demo tidak ditemukan: ${name}`);
@@ -128,7 +133,6 @@ export function seedDemoData(db: DatabaseClient): { userId: string; created: boo
     const day = addDaysToISO(today, -offset);
     const date = new Date(`${day}T00:00:00Z`);
     const dayOfMonth = date.getUTCDate();
-    const weekday = date.getUTCDay();
 
     // Gaji bulanan.
     if (dayOfMonth === 25) {
@@ -174,8 +178,9 @@ export function seedDemoData(db: DatabaseClient): { userId: string; created: boo
     if (random() < 0.78) {
       const templatePool: DemoExpenseTemplate[] = [];
       for (const template of EXPENSE_TEMPLATES) {
-        const weight = template.weight * (weekday === 0 || weekday === 6 ? 1 : 1);
-        for (let index = 0; index < weight; index += 1) templatePool.push(template);
+        for (let index = 0; index < template.weight; index += 1) {
+          templatePool.push(template);
+        }
       }
       const template = templatePool[Math.floor(random() * templatePool.length)]!;
       const spread = template.max - template.min;
@@ -205,58 +210,53 @@ export function seedDemoData(db: DatabaseClient): { userId: string; created: boo
     }
   }
 
-  for (const row of rows) {
-    db.insert(transactions).values(row).run();
+  // Insert per batch agar tidak melebihi batas parameter SQL.
+  for (let index = 0; index < rows.length; index += 40) {
+    await db.insert(transactions).values(rows.slice(index, index + 40));
   }
 
-  db.insert(goals)
-    .values([
-      {
-        id: randomUUID(),
-        userId,
-        name: "Dana Darurat",
-        targetAmount: 20_000_000,
-        savedAmount: 7_500_000,
-        deadline: addDaysToISO(today, 180),
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: randomUUID(),
-        userId,
-        name: "Liburan ke Bali",
-        targetAmount: 8_000_000,
-        savedAmount: 3_200_000,
-        deadline: addDaysToISO(today, 95),
-        createdAt: now,
-        updatedAt: now,
-      },
-    ])
-    .run();
-
-  db.insert(budgets)
-    .values({
+  await db.insert(goals).values([
+    {
       id: randomUUID(),
       userId,
-      categoryId: null,
-      limitAmount: 4_500_000,
-      period: today.slice(0, 7),
-      createdAt: now,
-    })
-    .run();
-
-  db.insert(reminders)
-    .values({
-      id: randomUUID(),
-      userId,
-      time: "20:00",
-      days: "mon,tue,wed,thu,fri,sat,sun",
-      isActive: true,
-      budgetAlertEnabled: true,
+      name: "Dana Darurat",
+      targetAmount: 20_000_000,
+      savedAmount: 7_500_000,
+      deadline: addDaysToISO(today, 180),
       createdAt: now,
       updatedAt: now,
-    })
-    .run();
+    },
+    {
+      id: randomUUID(),
+      userId,
+      name: "Liburan ke Bali",
+      targetAmount: 8_000_000,
+      savedAmount: 3_200_000,
+      deadline: addDaysToISO(today, 95),
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]);
+
+  await db.insert(budgets).values({
+    id: randomUUID(),
+    userId,
+    categoryId: null,
+    limitAmount: 4_500_000,
+    period: today.slice(0, 7),
+    createdAt: now,
+  });
+
+  await db.insert(reminders).values({
+    id: randomUUID(),
+    userId,
+    time: "20:00",
+    days: "mon,tue,wed,thu,fri,sat,sun",
+    isActive: true,
+    budgetAlertEnabled: true,
+    createdAt: now,
+    updatedAt: now,
+  });
 
   return { userId, created: true };
 }

@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   if (!isValidPeriod(period)) {
     return jsonError("Periode tidak valid. Gunakan format YYYY-MM.", 422);
   }
-  return jsonOk({ usage: getBudgetUsage(auth.user.id, period) });
+  return jsonOk({ usage: await getBudgetUsage(auth.user.id, period) });
 }
 
 /** Simpan / ubah batas belanja bulanan (satu batas global per bulan). */
@@ -39,7 +39,7 @@ export async function PUT(request: Request) {
   }
   const now = new Date().toISOString();
 
-  const existing = db
+  const existingRows = await db
     .select()
     .from(budgets)
     .where(
@@ -48,28 +48,26 @@ export async function PUT(request: Request) {
         eq(budgets.period, period),
         isNull(budgets.categoryId),
       ),
-    )
-    .get();
+    );
+  const existing = existingRows[0];
 
   if (existing) {
-    db.update(budgets)
+    await db
+      .update(budgets)
       .set({ limitAmount: parsed.data.limitAmount })
-      .where(eq(budgets.id, existing.id))
-      .run();
+      .where(eq(budgets.id, existing.id));
   } else {
-    db.insert(budgets)
-      .values({
-        id: crypto.randomUUID(),
-        userId: auth.user.id,
-        categoryId: null,
-        limitAmount: parsed.data.limitAmount,
-        period,
-        createdAt: now,
-      })
-      .run();
+    await db.insert(budgets).values({
+      id: crypto.randomUUID(),
+      userId: auth.user.id,
+      categoryId: null,
+      limitAmount: parsed.data.limitAmount,
+      period,
+      createdAt: now,
+    });
   }
 
-  return jsonOk({ usage: getBudgetUsage(auth.user.id, period) });
+  return jsonOk({ usage: await getBudgetUsage(auth.user.id, period) });
 }
 
 export async function DELETE(request: Request) {
@@ -81,15 +79,15 @@ export async function DELETE(request: Request) {
     return jsonError("Periode tidak valid. Gunakan format YYYY-MM.", 422);
   }
 
-  db.delete(budgets)
+  await db
+    .delete(budgets)
     .where(
       and(
         eq(budgets.userId, auth.user.id),
         eq(budgets.period, period),
         isNull(budgets.categoryId),
       ),
-    )
-    .run();
+    );
 
-  return jsonOk({ usage: getBudgetUsage(auth.user.id, period) });
+  return jsonOk({ usage: await getBudgetUsage(auth.user.id, period) });
 }

@@ -8,7 +8,7 @@ import { getReminder } from "@/lib/data";
 export async function GET() {
   const auth = await requireApiUser();
   if (auth.response) return auth.response;
-  return jsonOk({ reminder: getReminder(auth.user.id) });
+  return jsonOk({ reminder: await getReminder(auth.user.id) });
 }
 
 /**
@@ -26,7 +26,7 @@ export async function PUT(request: Request) {
     return jsonError("Data pengingat tidak valid.", 400);
   }
 
-  const current = getReminder(auth.user.id);
+  const current = await getReminder(auth.user.id);
   const merged = {
     time: current.time,
     days: current.days,
@@ -48,28 +48,26 @@ export async function PUT(request: Request) {
   };
 
   try {
-    const existing = db
+    const existingRows = await db
       .select()
       .from(reminders)
-      .where(eq(reminders.userId, auth.user.id))
-      .get();
+      .where(eq(reminders.userId, auth.user.id));
+    const existing = existingRows[0];
 
     if (existing) {
-      db.update(reminders).set(values).where(eq(reminders.id, existing.id)).run();
+      await db.update(reminders).set(values).where(eq(reminders.id, existing.id));
     } else {
-      db.insert(reminders)
-        .values({
-          id: crypto.randomUUID(),
-          userId: auth.user.id,
-          createdAt: now,
-          ...values,
-        })
-        .run();
+      await db.insert(reminders).values({
+        id: crypto.randomUUID(),
+        userId: auth.user.id,
+        createdAt: now,
+        ...values,
+      });
     }
   } catch (error) {
     console.error("[reminders-put]", error);
     return jsonError("Pengingat gagal disimpan. Coba lagi.", 500);
   }
 
-  return jsonOk({ reminder: getReminder(auth.user.id) });
+  return jsonOk({ reminder: await getReminder(auth.user.id) });
 }

@@ -1,8 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // better-sqlite3 is a native module: keep it out of the bundler.
-  serverExternalPackages: ["better-sqlite3"],
+  // libSQL punya binding native untuk mode file lokal; jangan di-bundle webpack.
+  serverExternalPackages: ["@libsql/client", "libsql"],
+  // File migrasi SQL dibaca saat runtime (auto-migrate) — ikutkan ke output Vercel.
+  outputFileTracingIncludes: {
+    "/**/*": ["./drizzle/**/*"],
+  },
   // Monorepo/lockfile tetangga bisa membingungkan Next saat menentukan root.
   outputFileTracingRoot: process.cwd(),
   // Badge dev Next tidak perlu muncul di screenshot/preview.

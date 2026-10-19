@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { and, eq, gt, lt } from "drizzle-orm";
-import { db } from "./db";
+import { db, ensureDatabaseReady } from "./db";
 import { sessions, users, type UserRow } from "./db/schema";
 import { seedDefaultCategories } from "./db/seed-defaults";
 import { hashPassword, verifyPassword } from "./password";
@@ -31,22 +31,23 @@ export function toSessionUser(row: UserRow): SessionUser {
   };
 }
 
-export function findUserByEmail(email: string): UserRow | undefined {
-  return db
+export async function findUserByEmail(email: string): Promise<UserRow | undefined> {
+  await ensureDatabaseReady();
+  const rows = await db
     .select()
     .from(users)
-    .where(eq(users.email, email.trim().toLowerCase()))
-    .get();
+    .where(eq(users.email, email.trim().toLowerCase()));
+  return rows[0];
 }
 
-export function createUser(input: {
+export async function createUser(input: {
   name: string;
   email: string;
   password: string;
   currency?: string;
-}): SessionUser {
+}): Promise<SessionUser> {
   const email = input.email.trim().toLowerCase();
-  if (findUserByEmail(email)) {
+  if (await findUserByEmail(email)) {
     throw new AuthError("Email ini sudah terdaftar. Coba masuk saja.", 409);
   }
 
@@ -61,13 +62,16 @@ export function createUser(input: {
     createdAt: now,
   };
 
-  db.insert(users).values(row).run();
-  seedDefaultCategories(db, row.id);
+  await db.insert(users).values(row);
+  await seedDefaultCategories(db, row.id);
   return toSessionUser(row);
 }
 
-export function authenticate(email: string, password: string): SessionUser {
-  const row = findUserByEmail(email);
+export async function authenticate(
+  email: string,
+  password: string,
+): Promise<SessionUser> {
+  const row = await findUserByEmail(email);
   if (!row || !verifyPassword(password, row.passwordHash)) {
     throw new AuthError("Email atau kata sandi salah.", 401);
   }
@@ -81,16 +85,16 @@ export async function createSession(
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
 
+  await ensureDatabaseReady();
+
   // Bersihkan sesi yang sudah kedaluwarsa.
-  db.delete(sessions).where(lt(sessions.expiresAt, new Date().toISOString())).run();
-  db.insert(sessions)
-    .values({
-      id: randomUUID(),
-      userId,
-      token,
-      expiresAt,
-    })
-    .run();
+  await db.delete(sessions).where(lt(sessions.expiresAt, new Date().toISOString()));
+  await db.insert(sessions).values({
+    id: randomUUID(),
+    userId,
+    token,
+    expiresAt,
+  });
 
   // `Secure` hanya dipasang bila koneksi HTTPS (atau dipaksa lewat COOKIE_SECURE),
   // supaya login tetap berfungsi saat diakses lewat HTTP LAN / tunnel tanpa TLS.
@@ -115,7 +119,8 @@ export async function destroySession(): Promise<void> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) {
-    db.delete(sessions).where(eq(sessions.token, token)).run();
+    await ensureDatabaseReady();
+    await db.delete(sessions).where(eq(sessions.token, token));
   }
   jar.delete(SESSION_COOKIE);
 }
@@ -126,7 +131,8 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
-  const row = db
+  await ensureDatabaseReady();
+  const rows = await db
     .select({ user: users })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
@@ -135,9 +141,9 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
         eq(sessions.token, token),
         gt(sessions.expiresAt, new Date().toISOString()),
       ),
-    )
-    .get();
+    );
 
+  const row = rows[0];
   return row ? toSessionUser(row.user) : null;
 });
 

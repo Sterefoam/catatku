@@ -1,52 +1,86 @@
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
-import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { createClient } from "@libsql/client";
+import { drizzle, type LibSQLDatabase } from "drizzle-orm/libsql";
+import { migrate } from "drizzle-orm/libsql/migrator";
 import * as schema from "./schema";
 
-export type DatabaseClient = BetterSQLite3Database<typeof schema>;
+/**
+ * Koneksi database: libSQL.
+ * - Lokal / VPS: URL `file:data/app.db` (format SQLite yang sama).
+ * - Produksi serverless (Vercel): set `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`.
+ */
+export type DatabaseClient = LibSQLDatabase<typeof schema>;
 
 type GlobalWithDb = typeof globalThis & {
   __catatkuDb?: DatabaseClient;
+  __catatkuReady?: Promise<void>;
 };
 
 const globalWithDb = globalThis as GlobalWithDb;
 
-export function databaseFile(): string {
-  return process.env.DATABASE_PATH ?? path.join(process.cwd(), "data", "app.db");
+export function databaseUrl(): string {
+  if (process.env.TURSO_DATABASE_URL) return process.env.TURSO_DATABASE_URL;
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  const file = process.env.DATABASE_PATH ?? "data/app.db";
+  return `file:${file.replace(/\\/g, "/")}`;
 }
 
-function createClient(): DatabaseClient {
-  const file = databaseFile();
-  fs.mkdirSync(path.dirname(file), { recursive: true });
+export function isRemoteDatabase(): boolean {
+  return !databaseUrl().startsWith("file:");
+}
 
-  const sqlite = new Database(file);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-  sqlite.pragma("busy_timeout = 5000");
+function createClientInstance(): DatabaseClient {
+  const url = databaseUrl();
 
-  const client = drizzle(sqlite, { schema });
-
-  // Auto-migrate on first use so `npm run dev` works without extra steps.
-  const migrationsFolder = path.join(process.cwd(), "drizzle");
-  if (fs.existsSync(path.join(migrationsFolder, "meta", "_journal.json"))) {
-    try {
-      migrate(client, { migrationsFolder });
-    } catch (error) {
-      // A concurrent worker may have applied it already — safe to continue.
-      console.warn("[catatku] migration skipped:", (error as Error).message);
-    }
+  if (url.startsWith("file:")) {
+    const filePath = path.resolve(url.slice("file:".length));
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
   }
 
-  return client;
+  const client = createClient({
+    url,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  });
+
+  return drizzle(client, { schema });
 }
 
-/** Singleton DB client — survives HMR in development. */
-export const db: DatabaseClient = globalWithDb.__catatkuDb ?? createClient();
+/** Singleton DB client — bertahan antar HMR di development. */
+export const db: DatabaseClient = globalWithDb.__catatkuDb ?? createClientInstance();
 
 if (process.env.NODE_ENV !== "production") {
   globalWithDb.__catatkuDb = db;
+}
+
+async function runMigrations(): Promise<void> {
+  if (process.env.SKIP_DB_MIGRATE === "1") return;
+
+  const migrationsFolder = path.join(process.cwd(), "drizzle");
+  if (!fs.existsSync(path.join(migrationsFolder, "meta", "_journal.json"))) {
+    console.warn("[catatku] folder migrasi tidak ditemukan, migrasi dilewati.");
+    return;
+  }
+
+  // Aman dipanggil berulang: migrasi yang sudah pernah jalan hanya dicek
+  // lewat tabel __drizzle_migrations.
+  await migrate(db, { migrationsFolder });
+}
+
+export function ensureDatabaseReady(): Promise<void> {
+  if (!readyPromise) {
+    readyPromise = runMigrations().catch((error) => {
+      readyPromise = null;
+      throw error;
+    });
+  }
+  return readyPromise;
+}
+
+let readyPromise: Promise<void> | null = globalWithDb.__catatkuReady ?? null;
+
+if (process.env.NODE_ENV !== "production") {
+  globalWithDb.__catatkuReady = readyPromise ?? undefined;
 }
 
 export { schema };

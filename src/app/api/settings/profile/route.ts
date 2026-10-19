@@ -13,12 +13,13 @@ export async function PATCH(request: Request) {
   const parsed = profileSchema.safeParse(body);
   if (!parsed.success) return validationError(parsed.error);
 
-  db.update(users)
+  await db
+    .update(users)
     .set({ name: parsed.data.name, currency: parsed.data.currency })
-    .where(eq(users.id, auth.user.id))
-    .run();
+    .where(eq(users.id, auth.user.id));
 
-  const row = db.select().from(users).where(eq(users.id, auth.user.id)).get();
+  const rows = await db.select().from(users).where(eq(users.id, auth.user.id));
+  const row = rows[0];
   if (!row) return jsonOk({ user: null });
   return jsonOk({ user: toSessionUser(row) });
 }

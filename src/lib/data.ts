@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, gte, like, lte, or, sql, type SQL } from "drizzle-orm";
-import { db } from "./db";
+import { db, ensureDatabaseReady } from "./db";
 import {
   budgets,
   categories,
@@ -90,10 +90,11 @@ export interface ListTransactionsOptions {
   to?: string;
 }
 
-export function listTransactions(
+export async function listTransactions(
   userId: string,
   options: ListTransactionsOptions = {},
-): TransactionDTO[] {
+): Promise<TransactionDTO[]> {
+  await ensureDatabaseReady();
   const clauses: SQL[] = [eq(transactions.userId, userId)];
 
   if (options.type) clauses.push(eq(transactions.type, options.type));
@@ -112,67 +113,72 @@ export function listTransactions(
   const limit = Math.min(Math.max(options.limit ?? 300, 1), 5000);
   const offset = Math.max(options.offset ?? 0, 0);
 
-  const rows = baseTransactionQuery()
+  const rows = await baseTransactionQuery()
     .where(and(...clauses))
     .orderBy(desc(transactions.date), desc(transactions.createdAt), desc(transactions.id))
     .limit(limit)
-    .offset(offset)
-    .all();
+    .offset(offset);
 
   return rows.map(toTransactionDTO);
 }
 
-export function listAllTransactions(userId: string): TransactionDTO[] {
+export async function listAllTransactions(userId: string): Promise<TransactionDTO[]> {
   return listTransactions(userId, { limit: 5000 });
 }
 
-export function getRecentTransactions(userId: string, limit = 5): TransactionDTO[] {
+export async function getRecentTransactions(
+  userId: string,
+  limit = 5,
+): Promise<TransactionDTO[]> {
   return listTransactions(userId, { limit });
 }
 
-export function getTransactionById(
+export async function getTransactionById(
   userId: string,
   transactionId: string,
-): TransactionDTO | null {
-  const row = baseTransactionQuery()
-    .where(and(eq(transactions.userId, userId), eq(transactions.id, transactionId)))
-    .get();
+): Promise<TransactionDTO | null> {
+  await ensureDatabaseReady();
+  const rows = await baseTransactionQuery().where(
+    and(eq(transactions.userId, userId), eq(transactions.id, transactionId)),
+  );
+  const row = rows[0];
   return row ? toTransactionDTO(row) : null;
 }
 
-export function createTransaction(
+export async function createTransaction(
   userId: string,
   input: TransactionInput,
-): TransactionDTO {
+): Promise<TransactionDTO> {
+  await ensureDatabaseReady();
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
-  db.insert(transactions)
-    .values({
-      id,
-      userId,
-      categoryId: input.categoryId,
-      type: input.type,
-      amount: input.amount,
-      note: input.note?.trim() ? input.note.trim() : null,
-      date: input.date,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
-  const created = getTransactionById(userId, id);
+  await db.insert(transactions).values({
+    id,
+    userId,
+    categoryId: input.categoryId,
+    type: input.type,
+    amount: input.amount,
+    note: input.note?.trim() ? input.note.trim() : null,
+    date: input.date,
+    createdAt: now,
+    updatedAt: now,
+  });
+  const created = await getTransactionById(userId, id);
   if (!created) throw new Error("Transaksi gagal disimpan.");
   return created;
 }
 
-export function updateTransaction(
+export async function updateTransaction(
   userId: string,
   transactionId: string,
   input: Partial<TransactionInput>,
-): TransactionDTO | null {
-  const exists = getTransactionById(userId, transactionId);
+): Promise<TransactionDTO | null> {
+  await ensureDatabaseReady();
+  const exists = await getTransactionById(userId, transactionId);
   if (!exists) return null;
 
-  db.update(transactions)
+  await db
+    .update(transactions)
     .set({
       ...(input.categoryId ? { categoryId: input.categoryId } : {}),
       ...(input.type ? { type: input.type } : {}),
@@ -183,29 +189,32 @@ export function updateTransaction(
         : {}),
       updatedAt: new Date().toISOString(),
     })
-    .where(and(eq(transactions.userId, userId), eq(transactions.id, transactionId)))
-    .run();
+    .where(and(eq(transactions.userId, userId), eq(transactions.id, transactionId)));
 
   return getTransactionById(userId, transactionId);
 }
 
-export function deleteTransaction(userId: string, transactionId: string): boolean {
-  const result = db
+export async function deleteTransaction(
+  userId: string,
+  transactionId: string,
+): Promise<boolean> {
+  await ensureDatabaseReady();
+  const result = await db
     .delete(transactions)
-    .where(and(eq(transactions.userId, userId), eq(transactions.id, transactionId)))
-    .run();
-  return result.changes > 0;
+    .where(and(eq(transactions.userId, userId), eq(transactions.id, transactionId)));
+  return Number(result.rowsAffected ?? 0) > 0;
 }
 
 /* ------------------------------------------------------------------ */
 /* Ringkasan / beranda                                                 */
 /* ------------------------------------------------------------------ */
 
-export function getSummary(userId: string): SummaryDTO {
+export async function getSummary(userId: string): Promise<SummaryDTO> {
+  await ensureDatabaseReady();
   const now = todayISO();
   const monthRange = resolveRange("month", now);
 
-  const allTotals = db
+  const allTotals = await db
     .select({
       type: transactions.type,
       total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
@@ -213,10 +222,9 @@ export function getSummary(userId: string): SummaryDTO {
     })
     .from(transactions)
     .where(eq(transactions.userId, userId))
-    .groupBy(transactions.type)
-    .all();
+    .groupBy(transactions.type);
 
-  const monthTotals = db
+  const monthTotals = await db
     .select({
       type: transactions.type,
       total: sql<number>`coalesce(sum(${transactions.amount}), 0)`,
@@ -229,8 +237,7 @@ export function getSummary(userId: string): SummaryDTO {
         lte(transactions.date, monthRange.end),
       ),
     )
-    .groupBy(transactions.type)
-    .all();
+    .groupBy(transactions.type);
 
   let income = 0;
   let expense = 0;
@@ -264,8 +271,9 @@ export function getSummary(userId: string): SummaryDTO {
 /* Kategori                                                            */
 /* ------------------------------------------------------------------ */
 
-export function getCategories(userId: string): CategoryDTO[] {
-  const rows = db
+export async function getCategories(userId: string): Promise<CategoryDTO[]> {
+  await ensureDatabaseReady();
+  const rows = await db
     .select({
       id: categories.id,
       name: categories.name,
@@ -277,18 +285,16 @@ export function getCategories(userId: string): CategoryDTO[] {
     })
     .from(categories)
     .where(eq(categories.userId, userId))
-    .orderBy(asc(categories.type), asc(categories.createdAt))
-    .all();
+    .orderBy(asc(categories.type), asc(categories.createdAt));
 
-  const usage = db
+  const usage = await db
     .select({
       categoryId: transactions.categoryId,
       count: sql<number>`count(*)`,
     })
     .from(transactions)
     .where(eq(transactions.userId, userId))
-    .groupBy(transactions.categoryId)
-    .all();
+    .groupBy(transactions.categoryId);
 
   const usageMap = new Map(usage.map((row) => [row.categoryId, Number(row.count)]));
 
@@ -303,12 +309,16 @@ export function getCategories(userId: string): CategoryDTO[] {
   }));
 }
 
-export function getCategoryById(userId: string, categoryId: string): CategoryDTO | null {
-  const row = db
+export async function getCategoryById(
+  userId: string,
+  categoryId: string,
+): Promise<CategoryDTO | null> {
+  await ensureDatabaseReady();
+  const rows = await db
     .select()
     .from(categories)
-    .where(and(eq(categories.userId, userId), eq(categories.id, categoryId)))
-    .get();
+    .where(and(eq(categories.userId, userId), eq(categories.id, categoryId)));
+  const row = rows[0];
   if (!row) return null;
   return {
     id: row.id,
@@ -324,13 +334,13 @@ export function getCategoryById(userId: string, categoryId: string): CategoryDTO
 /* Target tabungan                                                     */
 /* ------------------------------------------------------------------ */
 
-export function getGoals(userId: string): GoalDTO[] {
-  const rows = db
+export async function getGoals(userId: string): Promise<GoalDTO[]> {
+  await ensureDatabaseReady();
+  const rows = await db
     .select()
     .from(goals)
     .where(eq(goals.userId, userId))
-    .orderBy(desc(goals.createdAt))
-    .all();
+    .orderBy(desc(goals.createdAt));
 
   return rows.map((row) => {
     const progress =
@@ -355,12 +365,15 @@ export function getGoals(userId: string): GoalDTO[] {
 /* Batas belanja bulanan                                               */
 /* ------------------------------------------------------------------ */
 
-export function getBudget(userId: string, period = monthKey(todayISO())): BudgetDTO | null {
-  const rows = db
+export async function getBudget(
+  userId: string,
+  period = monthKey(todayISO()),
+): Promise<BudgetDTO | null> {
+  await ensureDatabaseReady();
+  const rows = await db
     .select()
     .from(budgets)
-    .where(and(eq(budgets.userId, userId), eq(budgets.period, period)))
-    .all();
+    .where(and(eq(budgets.userId, userId), eq(budgets.period, period)));
 
   const row = rows.find((candidate) => candidate.categoryId === null) ?? rows[0];
   if (!row) return null;
@@ -373,11 +386,12 @@ export function getBudget(userId: string, period = monthKey(todayISO())): Budget
   };
 }
 
-export function getBudgetUsage(
+export async function getBudgetUsage(
   userId: string,
   period = monthKey(todayISO()),
-): BudgetUsageDTO {
-  const budget = getBudget(userId, period);
+): Promise<BudgetUsageDTO> {
+  await ensureDatabaseReady();
+  const budget = await getBudget(userId, period);
   const month = resolveRange("month", `${period}-01`);
 
   const clauses: SQL[] = [
@@ -390,13 +404,12 @@ export function getBudgetUsage(
     clauses.push(eq(transactions.categoryId, budget.categoryId));
   }
 
-  const spentRow = db
+  const spentRows = await db
     .select({ total: sql<number>`coalesce(sum(${transactions.amount}), 0)` })
     .from(transactions)
-    .where(and(...clauses))
-    .get();
+    .where(and(...clauses));
 
-  const spent = Number(spentRow?.total ?? 0);
+  const spent = Number(spentRows[0]?.total ?? 0);
   const limit = budget?.limitAmount ?? 0;
   const percent = limit > 0 ? Math.min(999, Math.round((spent / limit) * 100)) : 0;
   const status: BudgetUsageDTO["status"] = !budget
@@ -422,13 +435,14 @@ export function getBudgetUsage(
 /* Pengingat                                                           */
 /* ------------------------------------------------------------------ */
 
-export function getReminder(userId: string): ReminderDTO {
-  const row = db
+export async function getReminder(userId: string): Promise<ReminderDTO> {
+  await ensureDatabaseReady();
+  const rows = await db
     .select()
     .from(reminders)
     .where(eq(reminders.userId, userId))
-    .orderBy(asc(reminders.createdAt))
-    .get();
+    .orderBy(asc(reminders.createdAt));
+  const row = rows[0];
 
   if (!row) {
     return {
@@ -453,12 +467,13 @@ export function getReminder(userId: string): ReminderDTO {
 /* Gabungan untuk beranda                                              */
 /* ------------------------------------------------------------------ */
 
-export function getDashboardData(userId: string) {
-  const summary = getSummary(userId);
+export async function getDashboardData(userId: string) {
+  await ensureDatabaseReady();
+  const summary = await getSummary(userId);
   return {
     summary,
-    recent: getRecentTransactions(userId, 6),
-    budgetUsage: getBudgetUsage(userId),
-    goals: getGoals(userId).slice(0, 2),
+    recent: await getRecentTransactions(userId, 6),
+    budgetUsage: await getBudgetUsage(userId),
+    goals: (await getGoals(userId)).slice(0, 2),
   };
 }

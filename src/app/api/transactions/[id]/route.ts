@@ -10,7 +10,7 @@ export async function GET(
   if (auth.response) return auth.response;
 
   const { id } = await params;
-  const transaction = getTransactionById(auth.user.id, id);
+  const transaction = await getTransactionById(auth.user.id, id);
   if (!transaction) return jsonError("Transaksi tidak ditemukan.", 404);
   return jsonOk({ transaction });
 }
@@ -27,7 +27,7 @@ export async function PATCH(
   const parsed = transactionSchema.partial().safeParse(body);
   if (!parsed.success) return validationError(parsed.error);
 
-  const transaction = updateTransaction(auth.user.id, id, parsed.data);
+  const transaction = await updateTransaction(auth.user.id, id, parsed.data);
   if (!transaction) return jsonError("Transaksi tidak ditemukan.", 404);
   return jsonOk({ transaction });
 }
@@ -40,7 +40,7 @@ export async function DELETE(
   if (auth.response) return auth.response;
 
   const { id } = await params;
-  const deleted = deleteTransaction(auth.user.id, id);
+  const deleted = await deleteTransaction(auth.user.id, id);
   if (!deleted) return jsonError("Transaksi tidak ditemukan.", 404);
   return jsonOk({ ok: true });
 }

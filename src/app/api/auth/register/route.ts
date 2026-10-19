@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return validationError(parsed.error);
 
   try {
-    const user = createUser(parsed.data);
+    const user = await createUser(parsed.data);
     await createSession(user.id, { secure: isSecureRequest(request) });
     return jsonOk({ user }, 201);
   } catch (error) {

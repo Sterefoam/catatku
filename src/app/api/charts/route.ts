@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     return jsonError("Rentang waktu tidak valid.", 422);
   }
 
-  const transactions = listAllTransactions(auth.user.id);
+  const transactions = await listAllTransactions(auth.user.id);
   const charts = buildCharts(transactions, raw as RangeKey, todayISO());
   return jsonOk(charts);
 }

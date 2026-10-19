@@ -7,7 +7,10 @@ import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_INCOME_CATEGORIES } from "../consta
  * Menanam kategori bawaan untuk pengguna baru, supaya ia bisa langsung
  * mencatat transaksi pertama tanpa mengatur apa pun.
  */
-export function seedDefaultCategories(db: DatabaseClient, userId: string): void {
+export async function seedDefaultCategories(
+  db: DatabaseClient,
+  userId: string,
+): Promise<void> {
   const now = new Date().toISOString();
   const rows = [
     ...DEFAULT_EXPENSE_CATEGORIES.map((category) => ({
@@ -32,5 +35,5 @@ export function seedDefaultCategories(db: DatabaseClient, userId: string): void 
     })),
   ];
 
-  db.insert(categories).values(rows).run();
+  await db.insert(categories).values(rows);
 }

@@ -18,7 +18,7 @@ const createGoalSchema = goalSchema.extend({
 export async function GET() {
   const auth = await requireApiUser();
   if (auth.response) return auth.response;
-  return jsonOk({ goals: getGoals(auth.user.id) });
+  return jsonOk({ goals: await getGoals(auth.user.id) });
 }
 
 export async function POST(request: Request) {
@@ -31,20 +31,18 @@ export async function POST(request: Request) {
 
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
-  db.insert(goals)
-    .values({
-      id,
-      userId: auth.user.id,
-      name: parsed.data.name,
-      targetAmount: parsed.data.targetAmount,
-      savedAmount: parsed.data.savedAmount ?? 0,
-      deadline: parsed.data.deadline ?? null,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(goals).values({
+    id,
+    userId: auth.user.id,
+    name: parsed.data.name,
+    targetAmount: parsed.data.targetAmount,
+    savedAmount: parsed.data.savedAmount ?? 0,
+    deadline: parsed.data.deadline ?? null,
+    createdAt: now,
+    updatedAt: now,
+  });
 
-  const goal = getGoals(auth.user.id).find((item) => item.id === id);
+  const goal = (await getGoals(auth.user.id)).find((item) => item.id === id);
   if (!goal) return jsonError("Target gagal disimpan. Coba lagi.", 500);
   return jsonOk({ goal }, 201);
 }

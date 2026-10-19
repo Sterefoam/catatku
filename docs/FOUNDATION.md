@@ -1,6 +1,6 @@
 # FONDASI PROYEK CATATKU — Baca ini dulu
 
-Aplikasi PWA pencatat keuangan pribadi. Stack: **Next.js 15 App Router + TypeScript + Tailwind CSS v4 + Drizzle ORM + SQLite (better-sqlite3)**, mobile-first, tema terang/gelap.
+Aplikasi PWA pencatat keuangan pribadi. Stack: **Next.js 15 App Router + TypeScript + Tailwind CSS v4 + Drizzle ORM + libSQL (file lokal / Turso di cloud)**, mobile-first, tema terang/gelap.
 
 Repo root: `C:\Users\ryana\OneDrive\Documents\deepseek-harness\default-workspace`
 

@@ -1,11 +1,77 @@
 # 🚀 Panduan Publish — Buka Catatku di iPhone
 
-Aplikasi ini adalah **server Node.js + SQLite**, jadi ada dua hal yang perlu dipahami:
+Aplikasi ini adalah **aplikasi Next.js dengan database libSQL**. Ada dua pilihan:
 
-1. **Butuh proses server yang hidup** (tidak cukup upload file statis). Jalankan `npm run build && npm start` di komputer/server.
-2. **SQLite butuh disk permanen** (file `data/app.db`). Saat deploy ke cloud, mount volume ke folder data dan set `DATABASE_PATH`.
+1. **Di komputer sendiri** — jalankan `npm run build && npm start`, lalu akses lewat LAN atau tunnel (bagian B/C). Aplikasi mati saat komputer dimatikan.
+2. **Di cloud (permanen)** — deploy ke **Vercel + Turso** (gratis) agar tetap hidup 24/7 walaupun laptop dimatikan. Ini yang direkomendasikan untuk pemakaian sehari-hari.
 
-Pilih salah satu jalur di bawah sesuai kebutuhan.
+Database:
+- Lokal: file SQLite `data/app.db` (kompatibel libSQL).
+- Produksi: **Turso** (libSQL cloud) — set `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`. Tidak ada file yang perlu di-mount.
+
+---
+
+## ⭐ Rekomendasi: Vercel + Turso (gratis, laptop boleh mati)
+
+Kombinasi gratis: Vercel Hobby (hosting) + Turso free tier (database libSQL). HTTPS otomatis, bisa dipasang sebagai PWA di iPhone, dan **tetap hidup meski laptop mati**.
+
+### 1. Buat database Turso
+
+1. Daftar gratis di **[turso.tech](https://turso.tech)** (bisa login dengan GitHub/Google).
+2. **Create Database** → nama `catatku` → pilih region terdekat (mis. Singapore).
+3. Catat **Database URL** (bentuknya `libsql://catatku-xxxx.turso.io`).
+4. Buka database → **Create Token** (atau menu Tokens) → salin **auth token**.
+
+### 2. Siapkan database (dari komputer)
+
+Buat file `.env.local` di root proyek (tidak ikut ter-commit):
+
+```ini
+TURSO_DATABASE_URL="libsql://catatku-xxxx.turso.io"
+TURSO_AUTH_TOKEN="token-dari-turso"
+```
+
+Lalu jalankan migrasi + (opsional) data demo:
+
+```powershell
+npm run db:migrate
+npm run db:seed
+```
+
+`db:migrate` membuat tabel di Turso. `db:seed` membuat akun demo `demo@catatku.id / demo12345` (boleh dilewati bila tidak perlu).
+
+### 3. Deploy ke Vercel
+
+**Opsi A — lewat GitHub (paling mudah):**
+
+1. Push proyek ini ke repository GitHub.
+2. Buka **[vercel.com/new](https://vercel.com/new)** → import repo.
+3. Tambahkan Environment Variables (Production + Preview):
+   - `TURSO_DATABASE_URL`
+   - `TURSO_AUTH_TOKEN`
+4. Klik **Deploy** → tunggu selesai.
+5. Buka domain `https://<nama-proyek>.vercel.app` di iPhone.
+
+**Opsi B — lewat CLI:**
+
+```powershell
+npx vercel            # login & buat project (pertama kali)
+npx vercel env add TURSO_DATABASE_URL production
+npx vercel env add TURSO_AUTH_TOKEN production
+npx vercel --prod
+```
+
+### 4. Pasang di iPhone
+
+Safari → buka domain Vercel → **Bagikan → Tambah ke Layar Utama**. Notifikasi browser bisa diaktifkan dari halaman **Pengingat**.
+
+### Catatan Vercel + Turso
+
+- **Tidak perlu** disk/volume; semua data di Turso.
+- Migrasi tabel otomatis dicek saat request pertama; kalau ingin mematikan, set `SKIP_DB_MIGRATE=1`.
+- Data lama dari laptop bisa dipindahkan: di **Pengaturan → Unduh JSON** (laptop), lalu **Pengaturan → Pulihkan dari cadangan JSON** setelah login di domain Vercel.
+- Jangan commit `.env.local` (sudah di-.gitignore).
+- Domain kustom bisa ditambahkan gratis di Vercel (mis. `catatku.domainmu.com`).
 
 ---
 

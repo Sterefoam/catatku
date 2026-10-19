@@ -4,5 +4,5 @@ import { getSummary } from "@/lib/data";
 export async function GET() {
   const auth = await requireApiUser();
   if (auth.response) return auth.response;
-  return jsonOk({ summary: getSummary(auth.user.id) });
+  return jsonOk({ summary: await getSummary(auth.user.id) });
 }

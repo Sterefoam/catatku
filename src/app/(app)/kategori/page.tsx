@@ -6,7 +6,7 @@ export const metadata = { title: "Kategori" };
 
 export default async function KategoriPage() {
   const user = await requireUser();
-  const categories = getCategories(user.id);
+  const categories = await getCategories(user.id);
 
   return <CategoriesView categories={categories} />;
 }

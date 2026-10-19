@@ -7,15 +7,15 @@ import { categories, transactions } from "@/lib/db/schema";
 import { getCategories } from "@/lib/data";
 
 async function categoryOf(userId: string, categoryId: string) {
-  return db
+  const rows = await db
     .select()
     .from(categories)
-    .where(and(eq(categories.userId, userId), eq(categories.id, categoryId)))
-    .get();
+    .where(and(eq(categories.userId, userId), eq(categories.id, categoryId)));
+  return rows[0];
 }
 
-function categoryDtoOf(userId: string, categoryId: string) {
-  return getCategories(userId).find((category) => category.id === categoryId) ?? null;
+async function categoryDtoOf(userId: string, categoryId: string) {
+  return (await getCategories(userId)).find((category) => category.id === categoryId) ?? null;
 }
 
 export async function PATCH(
@@ -58,7 +58,7 @@ export async function PATCH(
   }
 
   if (name && name.toLowerCase() !== row.name.toLowerCase()) {
-    const duplicate = db
+    const duplicateRows = await db
       .select({ id: categories.id })
       .from(categories)
       .where(
@@ -67,9 +67,8 @@ export async function PATCH(
           eq(categories.type, row.type),
           sql`lower(${categories.name}) = ${name.toLowerCase()}`,
         ),
-      )
-      .all()
-      .find((candidate) => candidate.id !== id);
+      );
+    const duplicate = duplicateRows.find((candidate) => candidate.id !== id);
     if (duplicate) {
       return jsonError("Nama kategori itu sudah dipakai. Pilih nama lain.", 409, {
         name: "Nama kategori itu sudah dipakai.",
@@ -77,16 +76,16 @@ export async function PATCH(
     }
   }
 
-  db.update(categories)
+  await db
+    .update(categories)
     .set({
       ...(name !== undefined ? { name } : {}),
       ...(icon !== undefined ? { icon } : {}),
       ...(color !== undefined ? { color } : {}),
     })
-    .where(and(eq(categories.userId, auth.user.id), eq(categories.id, id)))
-    .run();
+    .where(and(eq(categories.userId, auth.user.id), eq(categories.id, id)));
 
-  return jsonOk({ category: categoryDtoOf(auth.user.id, id) });
+  return jsonOk({ category: await categoryDtoOf(auth.user.id, id) });
 }
 
 export async function DELETE(
@@ -100,13 +99,12 @@ export async function DELETE(
   const row = await categoryOf(auth.user.id, id);
   if (!row) return jsonError("Kategori tidak ditemukan.", 404);
 
-  const usage = db
+  const usageRows = await db
     .select({ count: sql<number>`count(*)` })
     .from(transactions)
-    .where(and(eq(transactions.userId, auth.user.id), eq(transactions.categoryId, id)))
-    .get();
+    .where(and(eq(transactions.userId, auth.user.id), eq(transactions.categoryId, id)));
 
-  const usedBy = Number(usage?.count ?? 0);
+  const usedBy = Number(usageRows[0]?.count ?? 0);
   if (usedBy > 0) {
     return jsonError(
       `Kategori ini masih dipakai oleh ${usedBy} transaksi. Pindahkan transaksinya ke kategori lain dulu, lalu hapus kategori ini.`,
@@ -116,9 +114,9 @@ export async function DELETE(
   }
 
   try {
-    db.delete(categories)
-      .where(and(eq(categories.userId, auth.user.id), eq(categories.id, id)))
-      .run();
+    await db
+      .delete(categories)
+      .where(and(eq(categories.userId, auth.user.id), eq(categories.id, id)));
   } catch (error) {
     // Jaga-jaga bila ada transaksi baru yang masuk di antara pengecekan dan hapus.
     if (error instanceof Error && /foreign key/i.test(error.message)) {

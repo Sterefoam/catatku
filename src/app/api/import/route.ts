@@ -2,7 +2,7 @@ import { jsonError, jsonOk, readJson, requireApiUser, validationError } from "@/
 import { importSchema } from "@/lib/validation";
 import { db } from "@/lib/db";
 import { categories, transactions } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { toMinor } from "@/lib/money";
 import { randomUUID } from "node:crypto";
 
@@ -18,11 +18,10 @@ export async function POST(request: Request) {
   const parsed = importSchema.safeParse(body);
   if (!parsed.success) return validationError(parsed.error);
 
-  const existing = db
+  const existing = await db
     .select()
     .from(categories)
-    .where(eq(categories.userId, auth.user.id))
-    .all();
+    .where(eq(categories.userId, auth.user.id));
 
   const lookup = new Map<string, string>();
   for (const row of existing) {
@@ -39,34 +38,30 @@ export async function POST(request: Request) {
 
     if (!categoryId) {
       categoryId = randomUUID();
-      db.insert(categories)
-        .values({
-          id: categoryId,
-          userId: auth.user.id,
-          name: categoryName,
-          type: item.type,
-          icon: item.type === "income" ? "plus-circle" : "ellipsis",
-          color: item.type === "income" ? "#16A34A" : "#64748B",
-          isDefault: false,
-          createdAt: now,
-        })
-        .run();
+      await db.insert(categories).values({
+        id: categoryId,
+        userId: auth.user.id,
+        name: categoryName,
+        type: item.type,
+        icon: item.type === "income" ? "plus-circle" : "ellipsis",
+        color: item.type === "income" ? "#16A34A" : "#64748B",
+        isDefault: false,
+        createdAt: now,
+      });
       lookup.set(key, categoryId);
     }
 
-    db.insert(transactions)
-      .values({
-        id: randomUUID(),
-        userId: auth.user.id,
-        categoryId,
-        type: item.type,
-        amount: toMinor(item.amount, auth.user.currency),
-        note: item.note?.trim() || null,
-        date: item.date,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
+    await db.insert(transactions).values({
+      id: randomUUID(),
+      userId: auth.user.id,
+      categoryId,
+      type: item.type,
+      amount: toMinor(item.amount, auth.user.currency),
+      note: item.note?.trim() || null,
+      date: item.date,
+      createdAt: now,
+      updatedAt: now,
+    });
     imported += 1;
   }
 

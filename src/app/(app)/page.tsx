@@ -260,7 +260,7 @@ function GoalsPreview({
 
 export default async function HomePage() {
   const user = await requireUser();
-  const { summary, recent, budgetUsage, goals } = getDashboardData(user.id);
+  const { summary, recent, budgetUsage, goals } = await getDashboardData(user.id);
   const currency = user.currency;
   const firstName = user.name.split(" ")[0] ?? user.name;
   const greeting = greetingForHour(currentHourJakarta());

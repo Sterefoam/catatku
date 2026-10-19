@@ -5,7 +5,7 @@ import { getCategories } from "@/lib/data";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  const categories = getCategories(user.id);
+  const categories = await getCategories(user.id);
 
   return (
     <AppProvider user={user} categories={categories}>

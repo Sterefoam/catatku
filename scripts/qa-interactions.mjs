@@ -99,7 +99,7 @@ await step("catat pengeluaran lewat sheet + validasi kosong", async () => {
   await page.locator("#transaction-note").fill(QA_NOTE);
   await page.getByRole("button", { name: /^Simpan pengeluaran$/ }).click();
   await page.getByRole("dialog").waitFor({ state: "hidden", timeout: 15000 });
-  await page.waitForTimeout(2200);
+  await page.getByRole("button", { name: /Makan Rp5\.000/ }).first().waitFor({ timeout: 15000 });
   assert(
     (await page.getByRole("button", { name: /Makan Rp5\.000/ }).count()) > 0,
     "transaksi baru tidak muncul di transaksi terakhir",
