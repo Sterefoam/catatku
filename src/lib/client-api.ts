@@ -55,8 +55,11 @@ export function apiPut<T>(url: string, body: unknown): Promise<T> {
   return request<T>(url, { method: "PUT", body: JSON.stringify(body) });
 }
 
-export function apiDelete<T>(url: string): Promise<T> {
-  return request<T>(url, { method: "DELETE" });
+export function apiDelete<T>(url: string, body?: unknown): Promise<T> {
+  return request<T>(url, {
+    method: "DELETE",
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
 }
 
 export function apiErrorMessage(error: unknown): string {

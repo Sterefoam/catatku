@@ -12,12 +12,22 @@ import {
   LogOut,
   Moon,
   Sun,
+  Trash2,
+  TriangleAlert,
   Upload,
   UserRound,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Field, Input, Select } from "@/components/ui/input";
 import { Segmented } from "@/components/ui/segmented";
 import {
@@ -25,7 +35,7 @@ import {
   type BcaIntegrationInfo,
 } from "@/components/settings/bca-integration-card";
 import { CURRENCY_LIST } from "@/lib/constants";
-import { apiErrorMessage, apiPatch, apiPost } from "@/lib/client-api";
+import { apiDelete, apiErrorMessage, apiPatch, apiPost } from "@/lib/client-api";
 import { currencyMeta } from "@/lib/money";
 import type { SessionUser } from "@/lib/types";
 import { cn, initials } from "@/lib/utils";
@@ -79,6 +89,11 @@ export function SettingsView({
   const [importing, setImporting] = React.useState(false);
   const [importProgress, setImportProgress] = React.useState<string | null>(null);
   const [loggingOut, setLoggingOut] = React.useState(false);
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deletePassword, setDeletePassword] = React.useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = React.useState("");
+  const [deleting, setDeleting] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => setMounted(true), []);
@@ -124,6 +139,33 @@ export function SettingsView({
       toast.error(apiErrorMessage(error));
     } finally {
       setLoggingOut(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (!deletePassword) {
+      setDeleteError("Kata sandi wajib diisi.");
+      return;
+    }
+    if (deleteConfirmation.trim().toUpperCase() !== "HAPUS") {
+      setDeleteError('Ketik "HAPUS" untuk mengonfirmasi.');
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await apiDelete("/api/settings/account", {
+        password: deletePassword,
+        confirmation: "HAPUS",
+      });
+      toast.success("Akun dan seluruh datanya sudah dihapus.");
+      router.replace("/login");
+      router.refresh();
+    } catch (error) {
+      setDeleteError(apiErrorMessage(error));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -304,7 +346,84 @@ export function SettingsView({
           <span>Catatku v1.0.0</span>
           <span>{currencyMeta(user.currency).code}</span>
         </div>
+
+        <div className="mt-4 rounded-2xl border border-danger/30 bg-danger-soft/30 px-3.5 py-3">
+          <p className="flex items-center gap-1.5 text-[12px] font-semibold text-danger">
+            <TriangleAlert className="size-4" /> Hapus akun
+          </p>
+          <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">
+            Menghapus akun bersifat permanen: semua transaksi, kategori, target, anggaran, dan
+            pengingat ikut terhapus.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2.5 w-full justify-start text-danger hover:bg-danger-soft/60"
+            onClick={() => {
+              setDeleteError(null);
+              setDeletePassword("");
+              setDeleteConfirmation("");
+              setDeleteOpen(true);
+            }}
+          >
+            <Trash2 className="size-4" /> Hapus akun ini
+          </Button>
+        </div>
       </SectionCard>
+
+      <Dialog open={deleteOpen} onOpenChange={(open) => (!deleting ? setDeleteOpen(open) : null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus akun permanen?</DialogTitle>
+            <DialogDescription>
+              Seluruh data akun <strong>{user.email}</strong> akan dihapus dan tidak bisa
+              dikembalikan. Konfirmasi dengan kata sandi dan ketik <strong>HAPUS</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 px-5 pb-4">
+            <Field label="Kata sandi" htmlFor="delete-password">
+              <Input
+                id="delete-password"
+                type="password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                autoComplete="current-password"
+                placeholder="Kata sandi akun"
+              />
+            </Field>
+            <Field label='Ketik "HAPUS"' htmlFor="delete-confirmation">
+              <Input
+                id="delete-confirmation"
+                value={deleteConfirmation}
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
+                placeholder="HAPUS"
+                autoComplete="off"
+              />
+            </Field>
+            {deleteError ? (
+              <p className="text-[12px] font-medium text-danger">{deleteError}</p>
+            ) : null}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleting}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDeleteAccount}
+              disabled={deleting}
+              aria-busy={deleting || undefined}
+            >
+              {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              Hapus akun
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -14,17 +14,19 @@ Aplikasi **PWA mobile-first** untuk mencatat pemasukan & pengeluaran harian: sis
 | 2 | Grafik masuk vs keluar + per kategori, rentang minggu/bulan/tahun | ✅ |
 | 2 | Kategori bawaan + CRUD kategori dengan ikon & warna | ✅ |
 | 2 | Riwayat: cari, filter (kategori/jenis/tanggal), kelompok per hari, muat lebih banyak | ✅ |
+| 2 | Riwayat: hapus banyak transaksi sekaligus (mode pilih → hapus) | ✅ |
 | 3 | Target tabungan (progres %) + batas belanja bulanan + status pemakaian | ✅ |
 | 3 | Pengingat harian (jam/hari/toggle) + notifikasi batas belanja + notifikasi browser | ✅ |
 | 4 | Daftar/masuk/keluar akun, profil, mata uang, tema terang/gelap | ✅ |
 | 4 | Ekspor CSV/JSON + pulihkan cadangan JSON | ✅ |
-| — | **Integrasi BCA**: transaksi dari email notifikasi BCA masuk Kotak Masuk + impor mutasi/e-Statement CSV | ✅ |
+| 4 | Hapus akun permanen (konfirmasi kata sandi + ketik HAPUS) | ✅ |
+| — | **Integrasi BCA**: transaksi dari email notifikasi BCA masuk Kotak Masuk + impor mutasi/e-Statement PDF | ✅ |
 | — | PWA: manifest, ikon, service worker, offline fallback, install prompt | ✅ |
 | — | Data terisolasi per pengguna (sesi cookie + `user_id` di semua tabel) | ✅ |
 
 > 🔗 Integrasi BCA (email & impor mutasi) dijelaskan di [docs/BCA-INTEGRATION.md](docs/BCA-INTEGRATION.md). MyBCA tidak punya API publik untuk rekening pribadi, jadi auto-catat memakai email notifikasi resmi BCA (dengan langkah konfirmasi).
 
-**Akun demo:** hanya tersedia saat pengembangan lokal (pm run dev). Di produksi akun demo dinonaktifkan dan datanya tidak ada — gunakan akun pribadi hasil **Daftar**.
+**Akun demo:** hanya tersedia saat pengembangan lokal (`npm run dev`). Di produksi akun demo dinonaktifkan dan datanya tidak ada — gunakan akun pribadi hasil **Daftar**.
 
 ## 📸 Tangkapan layar
 

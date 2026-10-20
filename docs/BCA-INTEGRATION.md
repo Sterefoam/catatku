@@ -73,28 +73,15 @@ Berjalan di cloud Google, jadi tetap jalan walau laptop mati.
 - Pilih kategori → **Konfirmasi**; atau **Abaikan**.
 - Item dengan parser ragu ditandai **“Perlu dicek”** (`confidence: low`).
 
-## 5. Impor mutasi/e-Statement (CSV)
+## 5. Impor mutasi/e-Statement (PDF)
 
-Di Kotak Masuk bagian bawah, unggah file CSV. Format kolom yang didukung (header fleksibel):
+Di Kotak Masuk bagian bawah, unggah file **PDF** e-Statement/mutasi dari mBCA atau KlikBCA (maks 3 MB, PDF berteks — bukan hasil scan gambar).
 
-```csv
-tanggal,keterangan,nominal
-2026-10-19,AYAM GEPUK SYIFA,-50000
-2026-10-20,GAJI,8750000
-```
-
-Atau dengan kolom debit/kredit:
-
-```csv
-Tanggal;Keterangan;Debit;Kredit
-19/10/2026;QRIS AYAM GEPUK;50000;
-20/10/2026;GAJI;;8750000
-```
-
-- Tanggal: `dd/mm/yyyy`, `dd-mm-yyyy`, `yyyy-mm-dd`, `dd Mmm yyyy`.
-- Nominal: `Rp50.000`, `50,000.00`, tanda minus = pengeluaran.
+- Sistem mengekstrak teks PDF, lalu setiap baris mutasi yang diawali tanggal + nominal masuk ke Kotak Masuk sebagai transaksi tertunda.
+- Jenis (pemasukan/pengeluaran) ditebak dari kata kunci (transfer masuk, gaji, QRIS, pembayaran, debit/kredit); baris yang tidak yakin ditandai **"Perlu dicek"**.
 - Baris duplikat otomatis dilewati.
-- Untuk e-Statement PDF: kirim contohnya agar parser PDF bisa ditambahkan.
+- PDF terkunci/berpassword atau hasil scan gambar belum didukung.
+- Format tabel tiap bank berbeda: setelah impor, periksa nominal/jenis di Kotak Masuk sebelum konfirmasi. Jika ada format PDF yang belum terbaca, kirim contohnya agar parser disesuaikan.
 
 ## 6. Batasan
 

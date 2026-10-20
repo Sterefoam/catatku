@@ -2,17 +2,23 @@
 
 import * as React from "react";
 import {
+  AlertTriangle,
   ArrowDownLeft,
   ArrowUpRight,
+  CheckCheck,
+  CheckSquare,
   ChevronDown,
+  Loader2,
   Plus,
   ReceiptText,
   RotateCcw,
   Search,
   SearchX,
   SlidersHorizontal,
+  Trash2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useApp } from "@/components/app/app-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +35,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
+import { apiErrorMessage, apiPost } from "@/lib/client-api";
 import { formatDayLabel } from "@/lib/date";
 import { MINUS, formatMoney } from "@/lib/money";
 import type { CategoryDTO, TransactionDTO } from "@/lib/types";
@@ -39,6 +46,7 @@ import {
   type HistoryFilterState,
 } from "./history-filters";
 import { HistoryGroup } from "./history-group";
+import { HistorySelectionProvider, type HistorySelection } from "./history-row";
 
 const BATCH_SIZE = 30;
 
@@ -134,12 +142,18 @@ export function HistoryView({
   currency: string;
   today: string;
 }) {
-  const { openCreate } = useApp();
+  const { openCreate, refresh } = useApp();
 
   const [query, setQuery] = React.useState("");
   const [filters, setFilters] = React.useState<HistoryFilterState>(EMPTY_HISTORY_FILTERS);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [batchLimit, setBatchLimit] = React.useState(BATCH_SIZE);
+
+  // Mode pilih-banyak + hapus massal.
+  const [selectionMode, setSelectionMode] = React.useState(false);
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(() => new Set<string>());
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const normalizedQuery = query.trim().toLowerCase();
   const filterCount = countActiveFilters(filters);
@@ -162,6 +176,13 @@ export function HistoryView({
       })
       .sort(sortNewestFirst);
   }, [transactions, filters, normalizedQuery]);
+
+  // Dasar "Pilih semua": semua transaksi yang cocok dengan pencarian/saringan
+  // saat ini — bukan hanya batch yang sudah tampil di layar.
+  const filteredIds = React.useMemo(() => filtered.map((transaction) => transaction.id), [filtered]);
+  const selectedCount = selectedIds.size;
+  const allFilteredSelected =
+    filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id));
 
   const stats = React.useMemo(() => {
     let income = 0;
@@ -218,6 +239,68 @@ export function HistoryView({
   const loadMore = React.useCallback(() => {
     setBatchLimit((current) => current + BATCH_SIZE);
   }, []);
+
+  const toggleSelected = React.useCallback((id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const enterSelectionMode = React.useCallback(() => {
+    setSelectedIds(new Set<string>());
+    setSelectionMode(true);
+  }, []);
+
+  const exitSelectionMode = React.useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set<string>());
+    setDeleteOpen(false);
+  }, []);
+
+  const toggleSelectAllFiltered = React.useCallback(() => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      const allSelected =
+        filteredIds.length > 0 && filteredIds.every((id) => next.has(id));
+      for (const id of filteredIds) {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  }, [filteredIds]);
+
+  const selection = React.useMemo<HistorySelection | null>(
+    () => (selectionMode ? { selectedIds, onToggle: toggleSelected } : null),
+    [selectionMode, selectedIds, toggleSelected],
+  );
+
+  async function handleDeleteSelected() {
+    if (deleting || selectedIds.size === 0) return;
+    const ids = [...selectedIds];
+    setDeleting(true);
+    try {
+      const result = await apiPost<{ deleted: number }>("/api/transactions/bulk-delete", { ids });
+      const deleted =
+        typeof result?.deleted === "number" && Number.isFinite(result.deleted)
+          ? result.deleted
+          : ids.length;
+      toast.success(`${deleted} transaksi dihapus.`);
+      // Berhasil: tutup dialog, keluar mode pilih, bersihkan pilihan, muat ulang data.
+      setDeleteOpen(false);
+      setSelectionMode(false);
+      setSelectedIds(new Set<string>());
+      refresh();
+    } catch (error) {
+      // Gagal: dialog tetap terbuka agar pengguna bisa mencoba lagi.
+      toast.error(apiErrorMessage(error));
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   function handleQueryChange(event: React.ChangeEvent<HTMLInputElement>) {
     setQuery(event.target.value);
@@ -339,6 +422,19 @@ export function HistoryView({
               ) : null}
             </div>
 
+            {!selectionMode ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={enterSelectionMode}
+                className="h-11 shrink-0 gap-1.5 px-3"
+                aria-label="Pilih beberapa transaksi untuk dihapus"
+              >
+                <CheckSquare className="size-4" aria-hidden />
+                <span className="hidden text-[13px] font-semibold sm:inline">Pilih</span>
+              </Button>
+            ) : null}
+
             <Button
               type="button"
               variant="outline"
@@ -359,6 +455,64 @@ export function HistoryView({
               ) : null}
             </Button>
           </div>
+
+          {selectionMode ? (
+            <div
+              className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 rounded-2xl border border-primary/30 bg-card/95 px-2.5 py-2 shadow-[0_12px_32px_-22px_rgba(8,35,25,0.55)] backdrop-blur"
+              role="group"
+              aria-label="Mode pilih transaksi"
+            >
+              <p className="flex min-w-0 items-center gap-2 pl-0.5">
+                <span
+                  aria-hidden
+                  className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary"
+                >
+                  <CheckSquare className="size-4" />
+                </span>
+                <span className="min-w-0">
+                  <span
+                    aria-live="polite"
+                    aria-atomic="true"
+                    className="block text-[13px] font-bold leading-tight"
+                  >
+                    {selectedCount} dipilih
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] font-medium text-muted-foreground">
+                    {filtered.length} transaksi cocok dengan saringan
+                  </span>
+                </span>
+              </p>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="soft"
+                  onClick={toggleSelectAllFiltered}
+                  disabled={filtered.length === 0}
+                  className="h-10 gap-1.5 px-3 text-[12.5px]"
+                  aria-label={
+                    allFilteredSelected
+                      ? `Batalkan pilihan semua ${filtered.length} transaksi yang cocok`
+                      : `Pilih semua ${filtered.length} transaksi yang cocok`
+                  }
+                >
+                  {allFilteredSelected ? (
+                    <CheckCheck className="size-4" aria-hidden />
+                  ) : (
+                    <CheckSquare className="size-4" aria-hidden />
+                  )}
+                  {allFilteredSelected ? "Batalkan semua" : "Pilih semua"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={exitSelectionMode}
+                  className="h-10 gap-1 px-2.5 text-[12.5px]"
+                >
+                  <X className="size-4" aria-hidden /> Batal
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="hidden sm:block">
             <Card className="p-3">
@@ -441,17 +595,19 @@ export function HistoryView({
             />
           ) : (
             <>
-              <div className="space-y-4">
-                {visibleGroups.map((group) => (
-                  <HistoryGroup
-                    key={group.date}
-                    date={group.date}
-                    transactions={group.items}
-                    currency={currency}
-                    today={today}
-                  />
-                ))}
-              </div>
+              <HistorySelectionProvider selection={selection}>
+                <div className="space-y-4">
+                  {visibleGroups.map((group) => (
+                    <HistoryGroup
+                      key={group.date}
+                      date={group.date}
+                      transactions={group.items}
+                      currency={currency}
+                      today={today}
+                    />
+                  ))}
+                </div>
+              </HistorySelectionProvider>
 
               <div className="flex flex-col items-center gap-2 pt-1">
                 {hasMore ? (
@@ -473,6 +629,34 @@ export function HistoryView({
               </div>
             </>
           )}
+
+          {selectionMode ? (
+            <div
+              className="sticky bottom-2 z-30 max-lg:bottom-[calc(env(safe-area-inset-bottom,0px)_+_5.5rem)]"
+              role="region"
+              aria-label="Aksi transaksi terpilih"
+            >
+              <div className="flex items-center gap-2 rounded-2xl border border-border/80 bg-card/95 p-2 pl-4 shadow-[0_18px_44px_-22px_rgba(8,35,25,0.6)] backdrop-blur">
+                <p className="min-w-0 flex-1 text-[13px] font-semibold leading-tight">
+                  {selectedCount} transaksi dipilih
+                  <span className="mt-0.5 block text-[11px] font-medium text-muted-foreground">
+                    {selectedCount === 0
+                      ? "Ketuk baris untuk memilih transaksi."
+                      : "Ketuk Hapus untuk melanjutkan."}
+                  </span>
+                </p>
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => setDeleteOpen(true)}
+                  disabled={selectedCount === 0}
+                  className="h-11 shrink-0 gap-1.5 px-4"
+                >
+                  <Trash2 className="size-4" aria-hidden /> Hapus
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
 
@@ -507,6 +691,61 @@ export function HistoryView({
             </Button>
             <Button type="button" className="flex-1" onClick={() => setFiltersOpen(false)}>
               Selesai
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          // Jangan biarkan dialog tertutup saat proses hapus masih berjalan.
+          if (deleting) return;
+          setDeleteOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus {selectedCount} transaksi?</DialogTitle>
+            <DialogDescription>Tindakan ini tidak bisa dibatalkan.</DialogDescription>
+          </DialogHeader>
+          <DialogBody className="space-y-3">
+            <p className="text-[13px] leading-relaxed text-muted-foreground">
+              Transaksi yang dipilih akan dihapus permanen dari riwayat. Ringkasan, grafik, dan
+              total kategori ikut menyesuaikan.
+            </p>
+            <div className="flex items-start gap-2 rounded-2xl bg-danger-soft px-3.5 py-3 text-[12.5px] font-medium text-danger">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <p>{selectedCount} transaksi akan dihapus dan tidak dapat dikembalikan.</p>
+            </div>
+          </DialogBody>
+          <DialogFooter className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleting}
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              className="flex-1"
+              onClick={handleDeleteSelected}
+              disabled={deleting || selectedCount === 0}
+              aria-busy={deleting}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden /> Menghapus...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="size-4" aria-hidden /> Ya, hapus
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

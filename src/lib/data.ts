@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, like, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, like, lte, or, sql, type SQL } from "drizzle-orm";
 import { db, ensureDatabaseReady } from "./db";
 import {
   budgets,
@@ -203,6 +203,20 @@ export async function deleteTransaction(
     .delete(transactions)
     .where(and(eq(transactions.userId, userId), eq(transactions.id, transactionId)));
   return Number(result.rowsAffected ?? 0) > 0;
+}
+
+/** Hapus banyak transaksi sekaligus (maks 500 per permintaan). */
+export async function deleteTransactionsBulk(
+  userId: string,
+  ids: string[],
+): Promise<number> {
+  await ensureDatabaseReady();
+  const unique = [...new Set(ids.filter(Boolean))].slice(0, 500);
+  if (unique.length === 0) return 0;
+  const result = await db
+    .delete(transactions)
+    .where(and(eq(transactions.userId, userId), inArray(transactions.id, unique)));
+  return Number(result.rowsAffected ?? 0);
 }
 
 /* ------------------------------------------------------------------ */
