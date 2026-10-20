@@ -41,7 +41,13 @@ function InputWithIcon({
   );
 }
 
-export function AuthForm({ mode }: { mode: "login" | "register" }) {
+export function AuthForm({
+  mode,
+  demoEnabled = false,
+}: {
+  mode: "login" | "register";
+  demoEnabled?: boolean;
+}) {
   const router = useRouter();
   const isLogin = mode === "login";
 
@@ -187,7 +193,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           </Button>
         </form>
 
-        {isLogin ? (
+        {isLogin && demoEnabled ? (
           <>
             <div className="my-4 flex items-center gap-3 text-[11px] font-medium text-muted-foreground">
               <span className="h-px flex-1 bg-border" />

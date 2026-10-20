@@ -24,7 +24,7 @@ Aplikasi **PWA mobile-first** untuk mencatat pemasukan & pengeluaran harian: sis
 
 > 🔗 Integrasi BCA (email & impor mutasi) dijelaskan di [docs/BCA-INTEGRATION.md](docs/BCA-INTEGRATION.md). MyBCA tidak punya API publik untuk rekening pribadi, jadi auto-catat memakai email notifikasi resmi BCA (dengan langkah konfirmasi).
 
-**Akun demo:** `demo@catatku.id` / `demo12345` — tombol **“Coba akun demo”** di halaman masuk. Berisi ±2,5 bulan transaksi, 2 target tabungan, batas belanja, dan pengingat.
+**Akun demo:** hanya tersedia saat pengembangan lokal (pm run dev). Di produksi akun demo dinonaktifkan dan datanya tidak ada — gunakan akun pribadi hasil **Daftar**.
 
 ## 📸 Tangkapan layar
 

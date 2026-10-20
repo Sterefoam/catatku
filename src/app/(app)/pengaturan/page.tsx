@@ -7,22 +7,16 @@ export const metadata = { title: "Pengaturan" };
 export default async function SettingsPage() {
   const user = await requireUser();
 
-  const bcaIntegration = {
-    configured: Boolean(process.env.INBOUND_EMAIL_SECRET && process.env.INBOUND_EMAIL_USER),
-    secretConfigured: Boolean(process.env.INBOUND_EMAIL_SECRET),
-    boundEmail: process.env.INBOUND_EMAIL_USER?.trim() || null,
-    currentUserEmail: user.email,
-  };
-
   return (
     <div>
-      <PageHeader
-        backHref="/"
-        eyebrow="Akun"
-        title="Pengaturan"
-        subtitle="Atur profil, mata uang, tampilan, dan cadangan datamu."
+      <PageHeader backHref="/" title="Pengaturan" subtitle="Profil, tampilan, data, dan integrasi." />
+      <SettingsView
+        user={user}
+        bcaIntegration={{
+          configured: Boolean(process.env.INBOUND_EMAIL_SECRET),
+          email: user.email,
+        }}
       />
-      <SettingsView user={user} bcaIntegration={bcaIntegration} />
     </div>
   );
 }

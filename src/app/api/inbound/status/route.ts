@@ -1,19 +1,19 @@
 import { jsonOk, requireApiUser } from "@/lib/api";
 
-/** Status konfigurasi integrasi email BCA untuk halaman Pengaturan. */
+/**
+ * Status integrasi email BCA untuk halaman Pengaturan.
+ * Email penerima selalu mengikuti email akun yang sedang login.
+ */
 export async function GET() {
   const auth = await requireApiUser();
   if (auth.response) return auth.response;
 
   const secretConfigured = Boolean(process.env.INBOUND_EMAIL_SECRET);
-  const boundEmail = process.env.INBOUND_EMAIL_USER?.trim() || null;
 
   return jsonOk({
-    configured: secretConfigured && Boolean(boundEmail),
+    configured: secretConfigured,
     secretConfigured,
-    boundEmail,
     currentUserEmail: auth.user.email,
     webhookPath: "/api/inbound/email",
-    providerHint: "Postmark / Mailgun / SendGrid inbound webhook",
   });
 }

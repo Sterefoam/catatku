@@ -5,16 +5,23 @@ import { createPendingTransaction } from "@/lib/inbox";
 import { z } from "zod";
 
 /**
- * Webhook email masuk (Postmark / Mailgun / SendGrid / generic JSON).
+ * Webhook email masuk (Postmark / Mailgun / SendGrid / Apps Script / generic JSON).
  *
  * Keamanan:
- * - Wajib menyertakan `?secret=...` atau header `x-catatku-secret`
- *   yang sama dengan env INBOUND_EMAIL_SECRET.
- * - Email hanya diproses untuk akun pada env INBOUND_EMAIL_USER
- *   (aplikasi ini single-user: satu alamat email BCA per deployment).
+ * - Wajib menyertakan `?secret=...` atau header `x-catatku-secret` yang sama
+ *   dengan env INBOUND_EMAIL_SECRET.
+ * - Penerima email dicocokkan dengan email akun Catatku yang terdaftar.
+ *   Email BCA yang diteruskan harus berisi alamat email yang dipakai login.
  */
 
 const payloadSchema = z.record(z.string(), z.unknown());
+
+function extractEmails(value: string | undefined): string[] {
+  if (!value) return [];
+  const matches = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
+  if (!matches) return [];
+  return [...new Set(matches.map((match) => match.toLowerCase()))];
+}
 
 export async function POST(request: Request) {
   const secret = process.env.INBOUND_EMAIL_SECRET;
@@ -43,23 +50,24 @@ export async function POST(request: Request) {
     return jsonOk({ ok: true, parsed: 0, created: 0, reason: "payload email tidak dikenali" });
   }
 
-  const boundEmail = process.env.INBOUND_EMAIL_USER?.trim().toLowerCase();
-  if (!boundEmail) {
-    return jsonOk({
-      ok: true,
-      parsed: 0,
-      created: 0,
-      reason: "INBOUND_EMAIL_USER belum diatur",
-    });
+  // Cocokkan alamat penerima email dengan email akun yang terdaftar.
+  const recipients = extractEmails(email.to);
+  let user = null;
+  for (const recipient of recipients) {
+    const found = await findUserByEmail(recipient);
+    if (found) {
+      user = found;
+      break;
+    }
   }
 
-  const user = await findUserByEmail(boundEmail);
   if (!user) {
     return jsonOk({
       ok: true,
       parsed: 0,
       created: 0,
-      reason: "akun penerima tidak ditemukan",
+      reason: "email penerima tidak cocok dengan akun mana pun",
+      recipients,
     });
   }
 

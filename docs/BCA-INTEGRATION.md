@@ -41,9 +41,8 @@ Set di **Vercel → Project → Settings → Environment Variables** (Production
 | Variable | Contoh | Fungsi |
 | --- | --- | --- |
 | `INBOUND_EMAIL_SECRET` | string acak 32+ karakter | Kunci webhook (wajib, cegah spam) |
-| `INBOUND_EMAIL_USER` | `email-akun-catatku@gmail.com` | Email **akun Catatku** yang menerima transaksi |
 
-> Aplikasi ini single-user: satu alamat email BCA per deployment. `INBOUND_EMAIL_USER` harus sama dengan email login Catatku.
+> Tidak ada binding email terpisah. Webhook mencocokkan alamat **penerima email** (`To`) dengan email akun Catatku yang terdaftar. Jadi email BCA harus diteruskan dari/ke Gmail yang **sama dengan email login** akun tersebut.
 
 Webhook: `https://<domain>/api/inbound/email?secret=<INBOUND_EMAIL_SECRET>`
 
