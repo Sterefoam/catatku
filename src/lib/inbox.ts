@@ -57,9 +57,20 @@ function fingerprint(input: PendingTransactionInput): string {
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return (
-    error instanceof Error && /unique constraint failed/i.test(error.message)
-  );
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    if (!(current instanceof Error)) break;
+    const code = (current as Error & { code?: string }).code ?? "";
+    if (
+      /unique constraint failed|sqlite_constraint_unique|23505/i.test(
+        `${current.message} ${code}`,
+      )
+    ) {
+      return true;
+    }
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 /** Simpan transaksi tertunda; duplikat (externalId/fingerprint) diabaikan. */
