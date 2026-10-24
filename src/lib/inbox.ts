@@ -84,6 +84,41 @@ export async function createPendingTransaction(
   const now = new Date().toISOString();
   const id = randomUUID();
 
+  // Impor ulang setelah item dihapus/confirmed: kembalikan ke status pending
+  // dengan data terbaru, jangan diamkan sebagai duplikat.
+  const existing = await db
+    .select()
+    .from(pendingTransactions)
+    .where(
+      and(
+        eq(pendingTransactions.userId, userId),
+        eq(pendingTransactions.externalId, externalId),
+      ),
+    )
+    .limit(1);
+
+  if (existing[0]) {
+    if (existing[0].status === "pending") {
+      return { created: false, id: null };
+    }
+    await db
+      .update(pendingTransactions)
+      .set({
+        source: input.source,
+        type: input.type,
+        amount: input.amount,
+        date: input.date,
+        note: input.note?.trim() ? input.note.trim() : null,
+        rawSubject: input.rawSubject?.slice(0, 300) ?? null,
+        rawFrom: input.rawFrom?.slice(0, 200) ?? null,
+        confidence: input.confidence ?? null,
+        status: "pending",
+        updatedAt: now,
+      })
+      .where(eq(pendingTransactions.id, existing[0].id));
+    return { created: true, id: existing[0].id };
+  }
+
   try {
     await db.insert(pendingTransactions).values({
       id,

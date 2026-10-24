@@ -53,7 +53,7 @@ Webhook: `https://<domain>/api/inbound/email?secret=<INBOUND_EMAIL_SECRET>`
 Berjalan di cloud Google, jadi tetap jalan walau laptop mati.
 
 1. Buka [script.google.com](https://script.google.com) → **New project**.
-2. Salin isi file [`scripts/gmail-bca-forwarder.gs`](../scripts/gmail-bca-forwarder.gs).
+2. Salin isi file [`scripts/gmail-bca-forwarder.gs`](../scripts/gmail-bca-forwarder.gs). Versi terbaru mengirim **plain text + HTML** karena email BCA dari myBCA umumnya HTML-only. Jika sudah pernah memasang versi lama, tempel ulang file terbaru lalu jalankan `installTrigger()` dan `forwardBcaEmails()`.
 3. Ganti `WEBHOOK` dengan URL webhook + secret kamu.
 4. Jalankan fungsi **`installTrigger`** → izinkan akses Gmail + koneksi eksternal.
 5. Jalankan **`forwardBcaEmails`** sekali untuk uji (lihat log eksekusi).
@@ -65,6 +65,14 @@ Berjalan di cloud Google, jadi tetap jalan walau laptop mati.
 2. Set webhook penyedia ke URL Catatku di atas (HTTP POST JSON).
 3. Di Gmail, buat filter: dari `bca@bca.co.id` → **Forward** ke alamat inbound tersebut.
 4. Format payload yang didukung: Postmark (`From/Subject/TextBody/HtmlBody/MessageID`), Mailgun (`from/subject/body-plain`), SendGrid, atau JSON generik `{ from, subject, text, messageId }`.
+
+## 3b. Template email yang didukung
+
+- **QRIS Payment** — `Payment to` + `Total Payment`
+- **Transfer ke BCA / bank lain** — `Beneficiary Name` + `Transfer Amount`/`Amount` (+ `Fee` dijumlahkan untuk pengeluaran)
+- **Pocket Transaction** (top up pocket) — pengeluaran dengan catatan “Top Up Pocket”
+- **Flazz Top Up** — pengeluaran “Top Up Flazz”
+- **Transfer masuk / Transfer Received** — pemasukan (memakai `Sender Name` bila ada)
 
 ## 4. Konfirmasi di aplikasi
 

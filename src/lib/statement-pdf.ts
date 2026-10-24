@@ -82,7 +82,7 @@ const EXPENSE_WORDS =
 /* ------------------------------------------------------------------ */
 
 /**
- * Mengubah nominal dari PDF menjadi satuan minor (sen/rupiah tanpa desimal).
+ * Mengubah nominal dari PDF menjadi RUPIAH UTUH (satuan IDR aplikasi = Rp1).
  * Mendukung "28,000.00" (BCA) dan "50.000,00" (Indonesia).
  */
 function amountToMinor(raw: string): number | null {
@@ -111,7 +111,7 @@ function amountToMinor(raw: string): number | null {
 
   const value = Number(text);
   if (!Number.isFinite(value) || value <= 0) return null;
-  return Math.round(value * 100);
+  return Math.round(value);
 }
 
 const AMOUNT = String.raw`\d[\d.,]*[.,]\d{2}`;

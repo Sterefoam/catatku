@@ -6,10 +6,16 @@ import type { PendingConfidence } from "./inbox";
 /**
  * Parser email notifikasi transaksi BCA.
  *
- * Format email BCA bisa berbeda antar layanan (transfer, kartu debit,
- * pembayaran). Parser ini mencari nominal, jenis transaksi, tanggal, dan
- * keterangan secara heuristik; bila ragu, confidence = "low" sehingga
- * transaksi masuk ke Kotak Masuk untuk dicek pengguna.
+ * Email BCA punya beberapa template berbeda:
+ * - QRIS Payment          : Payment to + Total Payment
+ * - Transfer ke bank lain : Transfer Type + Beneficiary Name + Amount/Transfer Amount + Fee
+ * - Pocket Transaction    : Transaction Type "Pocket Transaction" + Amount
+ * - Flazz Top Up          : Top Up Amount
+ * - Transfer masuk        : Transfer Received / Sender Name / Amount
+ *
+ * Parser membaca pasangan "Label : nilai" pada email, dengan fallback heuristik.
+ * Nominal yang dikembalikan adalah RUPIAH UTUH (satuan IDR di aplikasi = Rp1,
+ * bukan sen).
  */
 
 export interface EmailPayload {
@@ -33,9 +39,9 @@ export interface ParsedEmailTransaction {
 }
 
 const INCOME_WORDS =
-  /(transfer\s+masuk|dana\s+masuk|penerimaan|pemasukan|gaji|payroll|refund|cashback|top\s*up|bunga|dividen|incoming|received|receive|salary|credit|\bcr\b)/i;
+  /(transfer\s+masuk|dana\s+masuk|penerimaan|pemasukan|gaji|payroll|refund|cashback|bunga|dividen|incoming|received|receive|salary|credit|kredit)/i;
 const EXPENSE_WORDS =
-  /(pembelian|pembayaran|qris|transfer\s+keluar|pengeluaran|penarikan|tarik\s+tunai|biaya\s+admin|admin\s+fee|withdrawal|purchase|payment|debit|debet|\bdb\b)/i;
+  /(pembelian|pembayaran|qris|transfer\s+keluar|transfer\s+to|pengeluaran|penarikan|tarik\s+tunai|biaya\s+admin|admin\s+fee|withdrawal|purchase|payment|debit|debet|autodebet|top\s*up|pocket|flazz)/i;
 
 const MONTH_LOOKUP: Record<string, number> = {};
 MONTHS_LONG.forEach((name, index) => {
@@ -44,7 +50,6 @@ MONTHS_LONG.forEach((name, index) => {
 MONTHS_SHORT.forEach((name, index) => {
   MONTH_LOOKUP[name.toLowerCase()] = index + 1;
 });
-// Alias bulan berbahasa Inggris (email BCA versi Inggris memakai Oct/Aug/Dec/May).
 Object.assign(MONTH_LOOKUP, {
   jan: 1,
   january: 1,
@@ -88,10 +93,11 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-/** Ubah "1.234.567,00" / "Rp 1,234,567.00" menjadi angka rupiah. */
+/** Ubah "1.234.567,00" / "Rp 1,234,567.00" menjadi angka rupiah utuh. */
 function parseMoney(raw: string): number | null {
   let text = raw.trim();
   if (!text) return null;
+  if (/^[-–—]+$/.test(text)) return null;
 
   const negative = /^\(.*\)$/.test(text) || text.startsWith("-");
   text = text.replace(/[^\d.,]/g, "");
@@ -103,72 +109,191 @@ function parseMoney(raw: string): number | null {
 
   if (lastSeparator >= 0) {
     const decimals = text.length - lastSeparator - 1;
-    // Trailing 2 digit -> kemungkinan desimal (mis. "1.234.567,00").
+    // Trailing 2 digit -> desimal (mis. "1.234.567,00" atau "52,364.00").
     if (decimals === 2 && lastSeparator > 0) {
       const integerPart = text.slice(0, lastSeparator).replace(/[.,]/g, "");
       const decimalPart = text.slice(lastSeparator + 1);
       const value = Number(`${integerPart}.${decimalPart}`);
-      if (Number.isFinite(value)) return negative ? -value : value;
+      if (Number.isFinite(value)) {
+        return Math.round(negative ? -value : value);
+      }
     }
   }
 
   const digits = text.replace(/[.,]/g, "");
   const value = Number(digits);
   if (!Number.isFinite(value)) return null;
-  return negative ? -value : value;
+  return Math.round(negative ? -value : value);
 }
 
-function pickAmount(text: string): { amount: number; confidence: PendingConfidence } | null {
-  // Contoh email BCA: "Total Payment : IDR 50,000.00" / "Total Pembayaran : Rp50.000"
-  const labeled =
-    /(?:total\s*(?:payment|amount|transaksi|pembayaran)?|nominal(?:\s+transaksi)?|jumlah(?:\s+transaksi)?|amount|nilai|sebesar)\s*[:=]?\s*(?:rp\.?|idr)?\s*([\d.,]+)/i.exec(
-      text,
-    );
-  if (labeled?.[1]) {
-    const amount = parseMoney(labeled[1]);
-    if (amount && amount > 0) return { amount, confidence: "high" };
+/** Ambil pasangan "Label : nilai" dari teks email. */
+function extractFields(text: string): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^([A-Za-z][A-Za-z0-9 ./()_-]{1,60}?)\s*:\s*(.*)$/.exec(line.trim());
+    if (!match) continue;
+    const key = match[1].toLowerCase().replace(/\s+/g, " ").trim();
+    const value = match[2].trim();
+    if (!value) continue;
+    if (!(key in fields)) fields[key] = value;
   }
+  return fields;
+}
 
-  const matches = [...text.matchAll(/(?:rp\.?|idr)\s*([\d.,]*\d[\d.,]*)/gi)];
-  for (const match of matches) {
-    const amount = parseMoney(match[1] ?? "");
-    if (!amount || amount <= 0) continue;
-    // Hindari menangkap angka saldo ("Saldo: Rp...").
-    const start = Math.max(0, (match.index ?? 0) - 28);
-    const context = text.slice(start, match.index ?? 0).toLowerCase();
-    if (/saldo|balance/.test(context)) continue;
-    return { amount, confidence: "low" };
+function pickField(fields: Record<string, string>, names: string[]): string | null {
+  for (const name of names) {
+    const value = fields[name];
+    if (value && value.trim() && !/^[-–—]+$/.test(value.trim())) return value.trim();
   }
   return null;
 }
 
-function pickType(text: string): { type: TxType; confidence: PendingConfidence } {
-  // Baris "Transaction Type : QRIS Payment" / "Jenis Transaksi : Transfer".
-  const typeLine =
-    /(?:transaction\s+type|jenis\s+transaksi|tipe\s+transaksi)\s*[:\-]\s*([^\n]{2,80})/i.exec(
-      text,
-    )?.[1] ?? "";
-  const scope = `${typeLine}\n${text}`;
+function pickAmount(
+  text: string,
+  fields: Record<string, string>,
+): { amount: number; fee: number; confidence: PendingConfidence } | null {
+  const groups: string[][] = [
+    ["total payment", "total pembayaran"],
+    ["transfer amount", "jumlah transfer"],
+    ["top up amount", "jumlah top up"],
+    ["total transfer", "total transfer amount"],
+    ["amount", "jumlah", "nominal", "nilai transaksi", "nilai"],
+  ];
 
-  const income = INCOME_WORDS.test(scope);
-  const expense = EXPENSE_WORDS.test(scope);
+  for (const labels of groups) {
+    const value = pickField(fields, labels);
+    if (!value) continue;
+    const amount = parseMoney(value);
+    if (amount && amount > 0) {
+      const feeValue = pickField(fields, ["fee", "biaya", "biaya transfer", "admin fee"]);
+      const fee = feeValue ? (parseMoney(feeValue) ?? 0) : 0;
+      return { amount, fee, confidence: "high" };
+    }
+  }
 
-  // "QRIS Payment", "Pembayaran", "Withdrawal" jelas pengeluaran.
-  if (/qris|payment|purchase|pembayaran|pembelian|penarikan|withdrawal/i.test(typeLine)) {
+  // Fallback: cari nominal bertanda IDR/Rp pada teks.
+  const matches = [...text.matchAll(/(?:rp\.?|idr)\s*([\d.,]*\d[\d.,]*)/gi)];
+  for (const match of matches) {
+    const amount = parseMoney(match[1] ?? "");
+    if (!amount || amount <= 0) continue;
+    const start = Math.max(0, (match.index ?? 0) - 32);
+    const context = text.slice(start, match.index ?? 0).toLowerCase();
+    if (/saldo|balance/.test(context)) continue;
+    return { amount, fee: 0, confidence: "low" };
+  }
+
+  return null;
+}
+
+function pickType(
+  text: string,
+  fields: Record<string, string>,
+): { type: TxType; confidence: PendingConfidence } {
+  const explicitType = [
+    fields["transaction type"],
+    fields["transfer type"],
+    fields["type of transaction"],
+    fields["jenis transaksi"],
+    fields["tipe transaksi"],
+  ]
+    .filter(Boolean)
+    .join(" | ");
+  const scope = `${explicitType}\n${text}`;
+
+  // Template QRIS / payment / transfer keluar / pocket / Flazz = pengeluaran.
+  if (
+    /(qris|payment|purchase|pembayaran|pembelian|transfer\s+to|transfer\s+keluar|top\s*up|pocket|flazz|autodebet|debit|debet|withdrawal|penarikan|tarik\s+tunai)/i.test(
+      explicitType,
+    )
+  ) {
     return { type: "expense", confidence: "high" };
   }
-  if (/incoming|received|transfer\s+from|salary|gaji|top\s*up|refund|pemasukan/i.test(typeLine)) {
+
+  // Template transfer masuk / penerimaan.
+  if (
+    /(transfer\s+received|transfer\s+masuk|received\s+from|incoming|sender|pengirim|dana\s+masuk|pemasukan|salary|gaji|refund|cashback|bunga|kredit)/i.test(
+      explicitType,
+    )
+  ) {
     return { type: "income", confidence: "high" };
   }
 
-  const debit = /\b(debit|debet|db)\b/i.test(scope);
-  const credit = /\b(kredit|credit|cr)\b/i.test(scope);
-  if (debit && !credit) return { type: "expense", confidence: "high" };
-  if (credit && !debit) return { type: "income", confidence: "high" };
-
+  const income = INCOME_WORDS.test(scope);
+  const expense = EXPENSE_WORDS.test(scope);
   if (income && !expense) return { type: "income", confidence: "high" };
   if (expense && !income) return { type: "expense", confidence: "high" };
   return { type: "expense", confidence: "low" };
+}
+
+function pickNote(
+  text: string,
+  fields: Record<string, string>,
+  subject: string,
+): string {
+  const explicitType = (
+    fields["transaction type"] ??
+    fields["transfer type"] ??
+    fields["type of transaction"] ??
+    ""
+  ).toLowerCase();
+
+  if (explicitType.includes("pocket")) {
+    const pocket = fields["beneficiary pocket"];
+    return pocket ? `Top Up Pocket (${pocket})` : "Top Up Pocket";
+  }
+  if (explicitType.includes("flazz")) {
+    return "Top Up Flazz";
+  }
+
+  const labeled = pickField(fields, [
+    "payment to",
+    "paid to",
+    "merchant name",
+    "merchant",
+    "pembayaran ke",
+    "dibayarkan ke",
+    "beneficiary name",
+    "nama penerima",
+    "recipient name",
+    "sender name",
+    "nama pengirim",
+    "pengirim",
+    "remarks",
+    "berita",
+    "keterangan",
+    "uraian",
+  ]);
+  if (labeled) return labeled.slice(0, 140);
+
+  const fallbackType = pickField(fields, [
+    "transaction type",
+    "transfer type",
+    "type of transaction",
+    "jenis transaksi",
+  ]);
+  if (fallbackType) return fallbackType.slice(0, 140);
+
+  const ignored =
+    /^(hello|hai|hi|status|this email|if you|best regards|pt bank|for inquiries|please contact|please save|you just made|here are the details|berikut|transaksi anda|demikian|kepada)/i;
+  const lines = text
+    .split(/\n+/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(
+      (line) =>
+        line.length >= 3 &&
+        !ignored.test(line) &&
+        !/^(rp|idr|saldo|tanggal|waktu|transaction date|amount)/i.test(line) &&
+        !/@|https?:\/\//i.test(line),
+    );
+  if (lines[0]) return lines[0].slice(0, 140);
+
+  const cleanSubject = subject
+    .replace(
+      /^(notifikasi|notification|bca|bank central asia|internet transaction journal)[^a-z0-9]*/gi,
+      "",
+    )
+    .trim();
+  return (cleanSubject || "Transaksi BCA").slice(0, 140);
 }
 
 function parseDateString(value: string): string | null {
@@ -185,7 +310,6 @@ function parseDateString(value: string): string | null {
     }
   }
 
-  // dd Mmm yyyy (mis. 19 Oct 2026 / 19 Okt 2026)
   const named =
     /(\d{1,2})\s+(jan|feb|mar|apr|mei|may|jun|jul|agu|aug|sep|okt|oct|nov|des|dec)[a-z]*\s+(\d{4})/i.exec(
       text,
@@ -213,18 +337,22 @@ function parseDateString(value: string): string | null {
   return null;
 }
 
-function pickDate(text: string): { date: string; confidence: PendingConfidence } {
-  // Utamakan field bertanda: "Transaction Date : 19 Oct 2026 19:24:43".
-  const labeled =
-    /(?:transaction\s+date|tanggal\s+transaksi|tanggal|waktu\s+transaksi|date)\s*[:\-]\s*([^\n]{4,60})/i.exec(
-      text,
-    );
-  if (labeled?.[1]) {
-    const parsed = parseDateString(labeled[1]);
+function pickDate(
+  text: string,
+  fields: Record<string, string>,
+): { date: string; confidence: PendingConfidence } {
+  const labeled = pickField(fields, [
+    "transaction date",
+    "tanggal transaksi",
+    "tanggal",
+    "waktu transaksi",
+    "date",
+  ]);
+  if (labeled) {
+    const parsed = parseDateString(labeled);
     if (parsed) return { date: parsed, confidence: "high" };
   }
 
-  // Format tanggal BCA versi Inggris: "19 Oct 2026".
   const named =
     /(\d{1,2})\s+(jan|feb|mar|apr|mei|may|jun|jul|agu|aug|sep|okt|oct|nov|des|dec)[a-z]*\s+(\d{4})/i.exec(
       text,
@@ -240,33 +368,6 @@ function pickDate(text: string): { date: string; confidence: PendingConfidence }
   return { date: todayISO(), confidence: "low" };
 }
 
-function pickNote(text: string, subject: string): string {
-  const labeled =
-    /(?:payment\s+to|paid\s+to|payment\s+from|received\s+from|pembayaran\s+ke|dibayarkan\s+ke|merchant(?:\s+name)?|keterangan|berita|uraian|nama|tujuan|deskripsi|detail)\s*[:\-]\s*([^\n]{2,140})/i.exec(
-      text,
-    );
-  if (labeled?.[1]) return labeled[1].replace(/\s+/g, " ").trim();
-
-  const ignored =
-    /^(hello|hai|hi|status|this email|if you|best regards|pt bank|for inquiries|please contact|please save|you just made|berikut|transaksi anda|demikian)/i;
-  const lines = text
-    .split(/\n+/)
-    .map((line) => line.replace(/\s+/g, " ").trim())
-    .filter(
-      (line) =>
-        line.length >= 3 &&
-        !ignored.test(line) &&
-        !/^(rp|idr|saldo|tanggal|waktu|transaction date|amount)/i.test(line) &&
-        !/@|https?:\/\//i.test(line),
-    );
-  if (lines[0]) return lines[0].slice(0, 140);
-
-  const cleanSubject = subject
-    .replace(/^(notifikasi|notification|bca|bank central asia|internet transaction journal)[^a-z0-9]*/gi, "")
-    .trim();
-  return (cleanSubject || "Transaksi BCA").slice(0, 140);
-}
-
 export function parseBcaEmail(payload: EmailPayload): ParsedEmailTransaction[] {
   const subject = (payload.subject ?? "").trim();
   const bodyText = payload.text?.trim()
@@ -278,16 +379,23 @@ export function parseBcaEmail(payload: EmailPayload): ParsedEmailTransaction[] {
 
   if (!text) return [];
 
-  const amountResult = pickAmount(text);
+  const fields = extractFields(bodyText || text);
+  const amountResult = pickAmount(bodyText || text, fields);
   if (!amountResult) return [];
 
-  const typeResult = pickType(text);
-  const dateResult = pickDate(text);
-  const note = pickNote(bodyText || text, subject);
+  const typeResult = pickType(text, fields);
+  const dateResult = pickDate(bodyText || text, fields);
+  const note = pickNote(bodyText || text, fields, subject);
   const from = (payload.from ?? "").trim();
   const externalId = payload.messageId?.trim()
     ? `email:${payload.messageId.trim()}`
     : `email:${createHash("sha256").update(`${from}|${subject}|${text}`).digest("hex")}`;
+
+  // Biaya transfer ditambahkan ke pengeluaran (total dana keluar).
+  let amount = amountResult.amount;
+  if (typeResult.type === "expense" && amountResult.fee > 0) {
+    amount += amountResult.fee;
+  }
 
   const confidence: PendingConfidence =
     amountResult.confidence === "high" &&
@@ -299,7 +407,7 @@ export function parseBcaEmail(payload: EmailPayload): ParsedEmailTransaction[] {
   return [
     {
       type: typeResult.type,
-      amount: Math.round(amountResult.amount),
+      amount: Math.round(amount),
       date: dateResult.date,
       note,
       confidence,
