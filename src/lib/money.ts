@@ -89,7 +89,8 @@ export function formatMoney(
   const negative = minor < 0;
   const value = Math.abs(minor) / 10 ** meta.decimals;
   const formatter = new Intl.NumberFormat(meta.locale, {
-    minimumFractionDigits: 0,
+    // USD/EUR/GBP selalu 2 desimal ("$404.20", bukan "$404.2"); IDR/JPY tetap 0.
+    minimumFractionDigits: meta.decimals,
     maximumFractionDigits: meta.decimals,
   });
   const body = `${meta.symbol}${formatter.format(value)}`;

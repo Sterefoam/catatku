@@ -1,0 +1,10 @@
+.next
+node_modules
+.npm-cache
+.npm-logs
+.vercel
+dsh-day-trader-skills
+docs/screenshots
+data
+tools
+*.log

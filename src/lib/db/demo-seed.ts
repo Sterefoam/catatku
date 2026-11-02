@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { addDaysToISO, todayISO } from "../date";
 import { hashPassword } from "../password";
 import type { DatabaseClient } from "./index";
-import { budgets, categories, goals, reminders, transactions, users } from "./schema";
+import { budgets, categories, goals, reminders, transactions, tradingSettings, users, watchlistItems } from "./schema";
 import { seedDefaultCategories } from "./seed-defaults";
 
 export const DEMO_EMAIL = "demo@catatku.id";
@@ -77,6 +77,7 @@ export async function seedDemoData(
   const existing = await db.select().from(users);
   const found = existing.find((row) => row.email === DEMO_EMAIL);
   if (found) {
+    await ensureDemoTradingData(db, found.id);
     return { userId: found.id, created: false };
   }
 
@@ -258,5 +259,68 @@ export async function seedDemoData(
     updatedAt: now,
   });
 
+  await ensureDemoTradingData(db, userId);
+
   return { userId, created: true };
+}
+
+/**
+ * Pastikan akun demo punya pengaturan Meja Trading + watchlist contoh.
+ * Aman dipanggil berulang (idempoten) untuk akun demo lama.
+ */
+export async function ensureDemoTradingData(
+  db: DatabaseClient,
+  userId: string,
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  const existingSettings = await db
+    .select({ userId: tradingSettings.userId })
+    .from(tradingSettings)
+    .where(eq(tradingSettings.userId, userId));
+  if (!existingSettings.length) {
+    await db.insert(tradingSettings).values({
+      userId,
+      mode: "paper",
+      budget: 500_000,
+      maxLossPerTrade: 5_000,
+      maxPosition: 200_000,
+      maxOrder: 150_000,
+      cashBuffer: 50_000,
+      maxTradesPerDay: 3,
+      dailyLossLimit: 15_000,
+      entryFrom: "09:45",
+      entryTo: "15:30",
+      flatBy: "15:55",
+      minRewardRisk: 1,
+      universe: "sp100",
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const existingWatchlist = await db
+    .select({ id: watchlistItems.id })
+    .from(watchlistItems)
+    .where(eq(watchlistItems.userId, userId));
+  if (!existingWatchlist.length) {
+    await db.insert(watchlistItems).values(
+      [
+        ["TSLA", "Tesla Inc."],
+        ["NVDA", "NVIDIA Corp."],
+        ["AAPL", "Apple Inc."],
+        ["AMD", "Advanced Micro Devices"],
+        ["PLTR", "Palantir Technologies"],
+        ["MSFT", "Microsoft Corp."],
+      ].map(([symbol, name]) => ({
+        id: randomUUID(),
+        userId,
+        symbol: symbol!,
+        name: name!,
+        source: "manual" as const,
+        note: null,
+        createdAt: now,
+      })),
+    );
+  }
 }

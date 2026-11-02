@@ -15,6 +15,13 @@
       "when": 1792432800000,
       "tag": "0001_pending_transactions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793613600000,
+      "tag": "0002_meja_trading",
+      "breakpoints": true
     }
   ]
 }

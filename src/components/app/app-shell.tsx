@@ -17,6 +17,7 @@ import {
   Settings,
   Tag,
   Target,
+  TrendingUp,
 } from "lucide-react";
 import { BrandLockup } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -37,6 +38,7 @@ const NAV = [
   { href: "/", label: "Beranda", icon: Home },
   { href: "/riwayat", label: "Riwayat", icon: History },
   { href: "/grafik", label: "Grafik", icon: BarChart3 },
+  { href: "/trading", label: "Trading", icon: TrendingUp },
   { href: "/kategori", label: "Kategori", icon: Tag },
   { href: "/target", label: "Target", icon: Target },
   { href: "/inbox", label: "Kotak masuk", icon: Inbox },
@@ -212,6 +214,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <DialogDescription>Semua yang kamu butuhkan untuk merapikan uang.</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4 pb-6">
+            <Link
+              href="/trading"
+              className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary-soft/70 p-3.5 transition-colors hover:bg-primary-soft"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                <TrendingUp className="size-5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13.5px] font-bold">Meja Trading</span>
+                <span className="block text-[11.5px] leading-snug text-muted-foreground">
+                  Periksa saham & latihan tanpa uang sungguhan
+                </span>
+              </span>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </Link>
+
             <div className="grid grid-cols-2 gap-2">
               {secondary.map((item) => {
                 const Icon = item.icon;

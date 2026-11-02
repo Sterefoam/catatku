@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
  * Catatku — skema database (SQLite / Drizzle ORM).
@@ -157,9 +157,150 @@ export const pendingTransactions = sqliteTable(
   ],
 );
 
+/* ------------------------------------------------------------------ */
+/* Meja Trading                                                        */
+/* Semua harga & nominal uang di tabel trading memakai SEN (integer).  */
+/* ------------------------------------------------------------------ */
+
+export const tradingSettings = sqliteTable("trading_settings", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  mode: text("mode", { enum: ["paper"] })
+    .notNull()
+    .default("paper"),
+  budget: integer("budget").notNull().default(500_000),
+  maxLossPerTrade: integer("max_loss_per_trade").notNull().default(5_000),
+  maxPosition: integer("max_position").notNull().default(200_000),
+  maxOrder: integer("max_order").notNull().default(150_000),
+  cashBuffer: integer("cash_buffer").notNull().default(50_000),
+  maxTradesPerDay: integer("max_trades_per_day").notNull().default(3),
+  dailyLossLimit: integer("daily_loss_limit").notNull().default(15_000),
+  entryFrom: text("entry_from").notNull().default("09:45"),
+  entryTo: text("entry_to").notNull().default("15:30"),
+  flatBy: text("flat_by").notNull().default("15:55"),
+  minRewardRisk: real("min_reward_risk").notNull().default(1),
+  universe: text("universe").notNull().default("sp100"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const watchlistItems = sqliteTable(
+  "watchlist_items",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    symbol: text("symbol").notNull(),
+    name: text("name"),
+    source: text("source", { enum: ["manual", "scan"] })
+      .notNull()
+      .default("manual"),
+    note: text("note"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("watchlist_user_symbol_idx").on(t.userId, t.symbol),
+    index("watchlist_user_idx").on(t.userId),
+  ],
+);
+
+export const tradePlans = sqliteTable(
+  "trade_plans",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    symbol: text("symbol").notNull(),
+    setupType: text("setup_type", { enum: ["orb", "level", "breakout20", "flag"] }).notNull(),
+    status: text("status", { enum: ["draft", "active", "triggered", "done", "cancelled"] })
+      .notNull()
+      .default("draft"),
+    entryTrigger: integer("entry_trigger").notNull(),
+    entry: integer("entry"),
+    stop: integer("stop").notNull(),
+    target: integer("target").notNull(),
+    stopRule: text("stop_rule").notNull(),
+    targetRule: text("target_rule").notNull(),
+    rMultiple: real("r_multiple").notNull().default(2),
+    riskPerShare: integer("risk_per_share").notNull(),
+    riskAmount: integer("risk_amount").notNull(),
+    qty: integer("qty").notNull(),
+    orHigh: integer("or_high"),
+    orLow: integer("or_low"),
+    orMinutes: integer("or_minutes"),
+    flatBy: text("flat_by").notNull().default("15:55"),
+    checksJson: text("checks_json").notNull().default("[]"),
+    note: text("note"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("trade_plans_user_status_idx").on(t.userId, t.status)],
+);
+
+export const paperOrders = sqliteTable(
+  "paper_orders",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    planId: text("plan_id").references(() => tradePlans.id, { onDelete: "set null" }),
+    symbol: text("symbol").notNull(),
+    side: text("side", { enum: ["long"] })
+      .notNull()
+      .default("long"),
+    orderType: text("order_type").notNull().default("bracket"),
+    qty: integer("qty").notNull(),
+    entry: integer("entry").notNull(),
+    stop: integer("stop").notNull(),
+    target: integer("target").notNull(),
+    status: text("status", { enum: ["pending", "filled", "closed", "cancelled"] })
+      .notNull()
+      .default("pending"),
+    filledAt: text("filled_at"),
+    filledPrice: integer("filled_price"),
+    closedAt: text("closed_at"),
+    closedPrice: integer("closed_price"),
+    exitReason: text("exit_reason", { enum: ["target", "stop", "flat-by", "manual"] }),
+    riskAmount: integer("risk_amount").notNull().default(0),
+    pnl: integer("pnl"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("paper_orders_user_status_idx").on(t.userId, t.status)],
+);
+
+export const priceAlerts = sqliteTable(
+  "price_alerts",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    symbol: text("symbol").notNull(),
+    kind: text("kind", { enum: ["above", "below", "stop", "target", "pct", "bell", "flat-by"] })
+      .notNull(),
+    level: integer("level"),
+    pct: real("pct"),
+    label: text("label").notNull().default(""),
+    isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+    triggeredAt: text("triggered_at"),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [index("price_alerts_user_active_idx").on(t.userId, t.isActive)],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type CategoryRow = typeof categories.$inferSelect;
 export type TransactionRow = typeof transactions.$inferSelect;
 export type GoalRow = typeof goals.$inferSelect;
 export type BudgetRow = typeof budgets.$inferSelect;
 export type ReminderRow = typeof reminders.$inferSelect;
+export type TradingSettingsRow = typeof tradingSettings.$inferSelect;
+export type WatchlistItemRow = typeof watchlistItems.$inferSelect;
+export type TradePlanRow = typeof tradePlans.$inferSelect;
+export type PaperOrderRow = typeof paperOrders.$inferSelect;
+export type PriceAlertRow = typeof priceAlerts.$inferSelect;

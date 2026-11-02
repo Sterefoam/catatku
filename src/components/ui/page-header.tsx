@@ -24,7 +24,7 @@ export function PageHeader({
         {backHref ? (
           <Link
             href={backHref}
-            className="-ml-1.5 mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="-ml-1.5 mt-0.5 inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label="Kembali"
           >
             <ChevronLeft className="size-5" />
